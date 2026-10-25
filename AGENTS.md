@@ -9,3 +9,6 @@ Only one enchantment active. Starter TNT is a permanent purchase granting one ch
 Use npm ci, npm test and npm run build before delivery. Browser smoke requires running dev server and Playwright Chromium.
 Never claim real SDK/ad/cloud verification from local tests. Never publish or change monetization/account settings without explicit user authorization.
 Do not commit node_modules, dist, preview, artifacts, user saves or reference video.
+
+
+Current user scope: MVP only. Yandex draft verification, physical-device QA, final economy balance and publication preparation are explicitly deferred. Do not expand this task into release preparation.

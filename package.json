@@ -1,0 +1,24 @@
+{
+  "name": "shaft-nudge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "build:preview": "vite build --mode preview --config vite.single.config.ts",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "package": "npm run build && npm run build:preview && python3 scripts/package.py"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.0.0",
+    "@types/ysdk": "latest",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.12"
+  }
+}
