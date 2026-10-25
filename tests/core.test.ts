@@ -1,9 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createRun,nudge,stepRun,blast,fuseCue,pickDamage,BLOCKS,FUSE_DELAY} from '../src/core.ts';
+import {createRun,nudge,stepRun,blast,fuseCue,pickDamage,BLOCKS,FUSE_DELAY,LEVELS} from '../src/core.ts';
 import type {Pick,BlockType} from '../src/core.ts';
 import {nudgeCount} from '../src/i18n.ts';
-import {freshProgress,buy,settle,reward} from '../src/progress.ts';
+import {freshProgress,buy,settle,reward,levelReward,PRICES} from '../src/progress.ts';
 
 test('wood has no directional control; stone spends one shared charge',()=>{
  const wood=createRun(0,'wood'); assert.equal(nudge(wood,-1),false);
@@ -50,13 +50,13 @@ test('each pick needs a different number of blows, and weak picks only chip ore 
  assert.equal(run.events.find(e=>e.type==='hit')?.weak,true);
 });
 test('purchases are permanent, sequential and cannot double-spend',()=>{
- const p=freshProgress();p.coins=200;assert.equal(buy(p,'stone'),true);assert.equal(p.coins,100);
- assert.equal(buy(p,'stone'),false);assert.equal(p.coins,100);assert.equal(buy(p,'diamond'),false);
+ const p=freshProgress();p.coins=100;assert.equal(buy(p,'stone'),true);assert.equal(p.coins,60);
+ assert.equal(buy(p,'stone'),false);assert.equal(p.coins,60);assert.equal(buy(p,'diamond'),false);
 });
 test('settling and rewarded callbacks cannot duplicate a result',()=>{
  const p=freshProgress(),run=createRun(0,'wood');run.status='won';run.ore=12;
- assert.equal(settle(p,run),72);assert.equal(settle(p,run),0);assert.equal(p.coins,72);
- assert.equal(reward(p,run.id),72);assert.equal(reward(p,run.id),0);assert.equal(p.coins,144);
+ assert.equal(settle(p,run),22);assert.equal(settle(p,run),0);assert.equal(p.coins,22);
+ assert.equal(reward(p,run.id),22);assert.equal(reward(p,run.id),0);assert.equal(p.coins,44);
 });
 test('failure never takes currency or grants ore currency',()=>{
  const p=freshProgress();p.coins=40;const run=createRun(0,'wood');run.ore=1000;run.status='lost';
@@ -90,4 +90,25 @@ test('nudge counts agree with the number in both languages',()=>{
 test('a shown cue survives the small bounce that would not start it',()=>{
  const run=createRun(0,'stone');run.status='playing';run.x=208;run.y=9*32+16-220;
  assert.equal(fuseCue(run),null);assert.ok(fuseCue(run,true));
+});
+test('mine rewards climb steeply and each pick costs five times the last',()=>{
+ assert.deepEqual([0,4,11].map(levelReward),[10,29,179]);
+ assert.deepEqual((['stone','iron','gold','diamond'] as const).map(k=>PRICES[k]),[40,200,1000,5000]);
+});
+test('obsidian yields only to diamond, bedrock to nothing, and TNT touches neither',()=>{
+ assert.equal(pickDamage('gold','obsidian'),0);assert.ok(pickDamage('diamond','obsidian')>0);
+ assert.equal(pickDamage('diamond','bedrock'),0);
+ const run=createRun(0,'wood');run.blocks=[{x:5,y:10,type:'obsidian',hp:BLOCKS.obsidian.hp},{x:7,y:10,type:'bedrock',hp:1},{x:6,y:11,type:'stone',hp:BLOCKS.stone.hp}];
+ blast(run,6*32+16,10*32+16);assert.equal(run.blocks[0].hp,BLOCKS.obsidian.hp);assert.equal(run.blocks[1].hp,1);assert.equal(run.blocks[2].hp,0);
+});
+test('obsidian starts at mine 6 and bedrock at mine 11, never beside the corridor',()=>{
+ const count=(level:number,type:string)=>createRun(level,'wood').blocks.filter(b=>b.type===type).length;
+ assert.equal(count(4,'obsidian'),0);assert.ok(count(5,'obsidian')>0);
+ assert.equal(count(9,'bedrock'),0);assert.ok(count(10,'bedrock')>0);
+ for(let level=0;level<LEVELS.length;level++){
+  const l=LEVELS[level];
+  for(const b of createRun(level,'wood').blocks)if(b.type==='obsidian'||b.type==='bedrock'){
+   const seg=Math.floor((b.y-4)/4);assert.ok(Math.abs(b.x-l.route[seg%l.route.length])>2);
+  }
+ }
 });

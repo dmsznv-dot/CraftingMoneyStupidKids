@@ -7,7 +7,7 @@ try{
  await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#drop');
  await page.clock.install();await page.locator('#drop').click();await page.clock.runFor(30000);
  assert.equal(await page.evaluate(()=>window.shaft.run.status),'won');
- const coins=await page.evaluate(()=>window.shaft.progress.coins);assert.ok(coins>=60);
+ const coins=await page.evaluate(()=>window.shaft.progress.coins);assert.ok(coins>=10,"first mine pays at least its base reward");
  await page.reload();await page.waitForSelector('#stage canvas');assert.equal(await page.evaluate(()=>window.shaft.progress.coins),coins);
  await page.locator('[data-action=next]').click();await page.locator('#drop').click();await page.clock.runFor(3000);
  assert.notEqual(await page.locator('#depth').textContent(),'0%');

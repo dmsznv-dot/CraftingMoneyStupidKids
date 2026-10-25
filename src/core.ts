@@ -1,25 +1,30 @@
 export type Pick = 'wood'|'stone'|'iron'|'gold'|'diamond';
 export type Enchant = 'none'|'wave'|'chain';
-export type BlockType = 'dirt'|'stone'|'hard'|'gold'|'gem'|'tnt';
+export type BlockType = 'dirt'|'stone'|'hard'|'gold'|'gem'|'tnt'|'obsidian'|'bedrock';
 export const TILE=32, COLS=14, WIDTH=COLS*TILE;
 // tier gates which blocks a pick mines properly; soft multiplies damage to dirt and stone.
 export const PICKS:Record<Pick,{nudges:number;hp:number;damage:number;tier:number;soft:number;price:number;color:number}>= {
  wood:{nudges:0,hp:100,damage:1,tier:0,soft:1,price:0,color:0xba8959},
- stone:{nudges:1,hp:130,damage:1.6,tier:1,soft:1,price:100,color:0xabb7b9},
- iron:{nudges:2,hp:170,damage:2.2,tier:2,soft:1,price:320,color:0xcfe4de},
- gold:{nudges:3,hp:145,damage:2.6,tier:2,soft:1.5,price:650,color:0xf4cb64},
- diamond:{nudges:4,hp:230,damage:3.2,tier:3,soft:1,price:1100,color:0x6ce5ca},
+ stone:{nudges:1,hp:130,damage:1.6,tier:1,soft:1,price:40,color:0xabb7b9},
+ iron:{nudges:2,hp:170,damage:2.2,tier:2,soft:1,price:200,color:0xcfe4de},
+ gold:{nudges:3,hp:145,damage:2.6,tier:2,soft:1.5,price:1000,color:0xf4cb64},
+ diamond:{nudges:4,hp:230,damage:3.2,tier:3,soft:1,price:5000,color:0x6ce5ca},
 };
 // hp: blows to break; tier: weakest pick that mines it properly; wear: pick durability per blow; ore: nuggets when mined.
-// A pick below the tier only chips the block (UNDERTIER damage) and the broken ore crumbles to nothing.
-export const BLOCKS:Record<BlockType,{hp:number;tier:number;wear:number;ore:number}>= {
- dirt:{hp:1,tier:0,wear:.55,ore:0},
- stone:{hp:2.5,tier:0,wear:.8,ore:0},
- gold:{hp:3,tier:1,wear:.65,ore:3},
- gem:{hp:4,tier:2,wear:.75,ore:8},
- hard:{hp:5,tier:2,wear:1.1,ore:0},
- tnt:{hp:1,tier:0,wear:0,ore:0},
+// A pick below the tier only chips the block (UNDERTIER damage, if chip) and the broken ore crumbles to nothing.
+// Obsidian yields to a diamond pick only; bedrock never breaks. Neither is touched by TNT.
+export const BLOCKS:Record<BlockType,{hp:number;tier:number;wear:number;ore:number;chip:boolean;blastproof:boolean}>= {
+ dirt:{hp:1,tier:0,wear:.55,ore:0,chip:true,blastproof:false},
+ stone:{hp:2.5,tier:0,wear:.8,ore:0,chip:true,blastproof:false},
+ gold:{hp:3,tier:1,wear:.65,ore:1,chip:true,blastproof:false},
+ gem:{hp:4,tier:2,wear:.75,ore:3,chip:true,blastproof:false},
+ hard:{hp:5,tier:2,wear:1.1,ore:0,chip:true,blastproof:false},
+ tnt:{hp:1,tier:0,wear:0,ore:0,chip:true,blastproof:false},
+ obsidian:{hp:6,tier:3,wear:.9,ore:0,chip:false,blastproof:true},
+ bedrock:{hp:1,tier:99,wear:.5,ore:0,chip:false,blastproof:true},
 };
+// Deeper mines bring new rock: obsidian from mine 6, bedrock from mine 11 (zero-based level indices).
+export const OBSIDIAN_FROM=5,BEDROCK_FROM=10;
 export const UNDERTIER=.35,BLAST_RADIUS=50,BLAST_DAMAGE=4,FUSE_DELAY=.3;
 // Collider in the sprite's own frame (the texture is drawn turned by -45°): body, two head tips, handle end.
 // Head tips are the working edge: they wear the pick less than a blow with the body or handle.
@@ -61,7 +66,7 @@ export function fuseCue(r:Run,shown=false):{x:number;y:number;dir:number}|null {
 }
 function random(seed:number){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 export function createRun(level:number,pick:Pick,enchant:Enchant='none',starter=false):Run {
- const l=LEVELS[Math.max(0,Math.min(11,level))],rand=random(l.seed),blocks:Block[]=[];
+ const li=Math.max(0,Math.min(11,level)),l=LEVELS[li],rand=random(l.seed),deep=random(l.seed*31+5),blocks:Block[]=[];
  for(let y=4;y<l.rows;y++){
   const route=l.route[Math.floor((y-4)/4)%l.route.length];
   for(let x=0;x<COLS;x++){
@@ -74,6 +79,11 @@ export function createRun(level:number,pick:Pick,enchant:Enchant='none',starter=
    else if(r<.25&&y>12)type='gem';
    else if(r<.25+l.density)type='hard';
    if(!near&&y>l.rows-5&&x>3&&x<11)type=(x+y)%3===0?'gem':'gold';
+   // Separate stream so the new rock never shifts the base layout of a mine.
+   // Unbreakable rock keeps clear of the corridor where it bends, so a ledge can never trap a wooden pick.
+   const d=deep(),seg=Math.floor((y-4)/4),clear=[seg-1,seg,seg+1].every(k=>Math.abs(x-l.route[((k%l.route.length)+l.route.length)%l.route.length])>2);
+   if(li>=OBSIDIAN_FROM&&clear&&type==='hard'&&d<.35+.05*(li-OBSIDIAN_FROM))type='obsidian';
+   if(li>=BEDROCK_FROM&&clear&&(y>=l.rows-2?d<.75:y>l.rows/2&&d<.05))type='bedrock';
    blocks.push({x,y,type,hp:BLOCKS[type].hp});
   }
  }
@@ -101,12 +111,13 @@ function destroy(r:Run,b:Block,drop=true){
 }
 // Damage a block; ore is lost when it is broken by a pick below the block's tier.
 function damage(r:Run,b:Block,amount:number,drop:boolean):boolean {
- if(b.hp<=0)return false;b.hp=Math.max(0,b.hp-amount);
+ if(b.hp<=0||amount<=0)return false;b.hp=Math.max(0,b.hp-amount);
  if(b.hp>0)return false;b.hp=1;destroy(r,b,drop);return true;
 }
 export function pickDamage(pick:Pick,type:BlockType):number {
  const p=PICKS[pick],soft=type==='dirt'||type==='stone'?p.soft:1;
- return p.damage*soft*(p.tier>=BLOCKS[type].tier?1:UNDERTIER);
+ const b=BLOCKS[type];
+ return p.tier>=b.tier?p.damage*soft:b.chip?p.damage*soft*UNDERTIER:0;
 }
 // One TNT goes off: neighbours take blast damage, adjacent TNT is lit with a short fuse instead of exploding at once.
 export function blast(r:Run,x:number,y:number){
@@ -114,6 +125,7 @@ export function blast(r:Run,x:number,y:number){
  for(const b of r.blocks){
   const bx=b.x*TILE+16,by=b.y*TILE+16;
   if(b.hp<=0||Math.hypot(bx-x,by-y)>BLAST_RADIUS)continue;
+  if(BLOCKS[b.type].blastproof)continue;
   if(b.type!=='tnt'){damage(r,b,BLAST_DAMAGE,true);continue;}
   if(bx===x&&by===y)b.hp=0;
   else if(!r.fuses.some(f=>f.x===b.x&&f.y===b.y)&&r.fuses.length<40){r.fuses.push({x:b.x,y:b.y,t:r.time+FUSE_DELAY});r.events.push({type:'fuse',x:bx,y:by});}

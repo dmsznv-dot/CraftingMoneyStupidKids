@@ -9,3 +9,4 @@
 .nudge-button.coach{border-color:#f3ce77;animation:coach-pulse .7s ease-in-out infinite alternate}
 @keyframes coach-pulse{from{box-shadow:inset 0 -4px #172a20,0 0 0 0 #f3ce7700}to{box-shadow:inset 0 -4px #172a20,0 0 0 7px #f3ce7744}}
 @media(prefers-reduced-motion:reduce){.nudge-button.coach{animation:none;box-shadow:inset 0 -4px #172a20,0 0 0 4px #f3ce7766}}
+.level-reward{display:flex;align-items:center;gap:6px;color:#e4ce8f!important}.level-reward .nugget{width:14px;height:10px}

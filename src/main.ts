@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import {createRun,stepRun,nudge,placeStarter,fuseCue,PICKS,BLOCKS,LEVELS} from './core.ts';
 import type {Pick,Run,RunEvent} from './core.ts';
-import {buy,settle,reward,PRICES} from './progress.ts';
+import {buy,settle,reward,PRICES,levelReward} from './progress.ts';
 import type {Item,Progress} from './progress.ts';
 import {SaveStore} from './storage.ts';
 import {Platform} from './platform.ts';
@@ -92,12 +92,12 @@ function renderModal(){
    return `<article class="upgrade"><div class="upgrade-icon">${key==='starter'?'<span class="tnt-mini">TNT</span>':svg('spark')}</div><div><b>${t(key as Key)}</b><p>${t((key+'Desc') as Key)}</p></div><button class="secondary" data-item="${key}" ${selected||!owned&&p.coins<PRICES[key]?'disabled':''}>${selected?svg('check'):owned?t('equip'):nugget+PRICES[key]}</button></article>`;
   }).join('')}</div>${p.enchant!=='none'?`<button class="text-button" data-action="unequip">${t('none')}</button>`:''}<p class="fine">${t('enchants')}</p></div>`;
  }else if(screen==='levels'){
-  content=`<div class="modal-panel">${closeButton()}<span class="eyebrow">12 ${t('level')}</span><h2>${t('levels')}</h2><div class="level-grid">${LEVELS.map((l,i)=>`<button class="level-card ${i===r.level?'selected':''}" data-level="${i}" ${i>p.unlocked?'disabled':''}><strong>${i<=p.unlocked?String(i+1).padStart(2,'0'):svg('lock')}</strong><span>${t((l.name==='chain'?'chainLevel':l.name) as Key)}</span><small>${i<=p.unlocked?`${t('best')}: ${p.best[i]}`:t('locked')}</small></button>`).join('')}</div></div>`;
+  content=`<div class="modal-panel">${closeButton()}<span class="eyebrow">12 ${t('level')}</span><h2>${t('levels')}</h2><div class="level-grid">${LEVELS.map((l,i)=>`<button class="level-card ${i===r.level?'selected':''}" data-level="${i}" ${i>p.unlocked?'disabled':''}><strong>${i<=p.unlocked?String(i+1).padStart(2,'0'):svg('lock')}</strong><span>${t((l.name==='chain'?'chainLevel':l.name) as Key)}</span><small class="level-reward">${nugget} +${levelReward(i)}</small><small>${i<=p.unlocked?`${t('best')}: ${p.best[i]}`:t('locked')}</small></button>`).join('')}</div></div>`;
  }else if(screen==='pause'){
   content=`<div class="modal-panel compact">${closeButton()}<div class="result-mark">${svg('pause')}</div><h2>${t('paused')}</h2><p class="muted">${t('pausedHint')}</p><button class="primary" data-action="resume">${t('resume')}${svg('arrow')}</button><button class="secondary" data-action="restart">${t('restart')}</button></div>`;
  }else if(screen==='result'){
   const won=r.status==='won',receipt=p.receipts[r.id];
-  content=`<div class="modal-panel compact result"><span class="eyebrow">${t('level')} ${String(r.level+1).padStart(2,'0')}</span><div class="result-mark ${won?'success':''}">${svg(won?'check':'mountain')}</div><h2>${t(won?'won':'lost')}</h2><p class="muted">${t(won&&r.level===11?'finalHint':won?'wonHint':'lostHint')}</p>${won?`<div class="reward-detail"><span>${t('base')}</span><b>+${60+r.level*10}</b><span>${t('oreBonus')}</span><b>+${r.ore}</b></div><div class="reward-total">${nugget}<strong>+${receipt?.amount??0}</strong><span>${t('total')}</span></div>`:''}<button class="primary" data-action="${won&&r.level<11?'next':'restart'}">${t(won&&r.level<11?'next':'again')}${svg('arrow')}</button>${won?`<button class="secondary ad-button" data-action="reward" ${receipt?.rewarded||platform.busy?'disabled':''}>${svg('spark')}${t(receipt?.rewarded?'bonusDone':'ad')}</button>`:''}<button class="text-button" data-action="workshop">${svg('workshop')}${t('shop')}</button></div>`;
+  content=`<div class="modal-panel compact result"><span class="eyebrow">${t('level')} ${String(r.level+1).padStart(2,'0')}</span><div class="result-mark ${won?'success':''}">${svg(won?'check':'mountain')}</div><h2>${t(won?'won':'lost')}</h2><p class="muted">${t(won&&r.level===11?'finalHint':won?'wonHint':'lostHint')}</p>${won?`<div class="reward-detail"><span>${t('base')}</span><b>+${levelReward(r.level)}</b><span>${t('oreBonus')}</span><b>+${r.ore}</b></div><div class="reward-total">${nugget}<strong>+${receipt?.amount??0}</strong><span>${t('total')}</span></div>`:''}<button class="primary" data-action="${won&&r.level<11?'next':'restart'}">${t(won&&r.level<11?'next':'again')}${svg('arrow')}</button>${won?`<button class="secondary ad-button" data-action="reward" ${receipt?.rewarded||platform.busy?'disabled':''}>${svg('spark')}${t(receipt?.rewarded?'bonusDone':'ad')}</button>`:''}<button class="text-button" data-action="workshop">${svg('workshop')}${t('shop')}</button></div>`;
  }else if(screen==='restore'){
   content=`<div class="modal-panel compact"><div class="result-mark">${pickIcon(r.pick)}</div><h2>${t('continueRun')}</h2><p class="muted">${t('continueHint')}</p><button class="primary" data-action="restore">${t('resume')}${svg('arrow')}</button><button class="secondary" data-action="restart">${t('restart')}</button></div>`;
  }else if(screen==='conflict'){
@@ -137,7 +137,7 @@ function tick(dt:number){
  if(lesson!==!!cue())hud();
  const outcome=(r as Run).status;
  if(outcome==='won'||outcome==='lost'){
-  settle(p,r);save(true);audio.play(outcome==='won'?'win':'hit');modal('result');render();
+  settle(p,r);save(true);if(outcome==='won')audio.play('win');else audio.play('break','hard');modal('result');render();
  }
  if(r.time-lastSave>2){save();lastSave=r.time;}
  if(r.time-lastHud>.08){hud();lastHud=r.time;}
@@ -148,9 +148,11 @@ function select(column:number){
  save();
 }
 function effect(e:RunEvent){
- if(e.type==='blast')audio.play('blast');else if(e.type==='break'&&e.value)audio.play('ore');else if(e.type==='hit')audio.play(e.weak?'clank':'hit');
+ if(e.type==='blast')audio.play('blast');else if(e.type==='fuse')audio.play('fuse');
+ else if(e.type==='break'){audio.play('break',e.kind);if(e.value)audio.play('ore');}
+ else if(e.type==='hit')audio.play(e.weak?'clank':'hit',e.kind);
  // Once per descent, name the pick that would mine the block that just stopped this one.
- if(e.type==='hit'&&e.weak&&e.kind&&warnedRun!==r.id){warnedRun=r.id;const need=pickKeys.find(k=>PICKS[k].tier>=BLOCKS[e.kind!].tier)!;notify(t('tooHard').replace('{pick}',t(need).toLowerCase()));}
+ if(e.type==='hit'&&e.weak&&e.kind&&warnedRun!==r.id){warnedRun=r.id;const need=pickKeys.find(k=>PICKS[k].tier>=BLOCKS[e.kind!].tier);notify(need?t('tooHard').replace('{pick}',t(need).toLowerCase()):t('unbreakable'));}
 }
 async function boot(){
  await platform.init();const loaded=await store.load(platform.player);p=loaded.local;remote=loaded.remote;

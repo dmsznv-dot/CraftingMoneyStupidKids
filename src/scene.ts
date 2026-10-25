@@ -3,7 +3,7 @@ import {COLS,TILE,WIDTH,PICKS,BLOCKS,BLAST_RADIUS} from './core.ts';
 import {blockPixels,crackPixels,pickPixels,paint,DEBRIS,CRACK_STAGES} from './textures.ts';
 import type {Run,RunEvent,BlockType,Pick} from './core.ts';
 export interface Bridge {run:()=>Run;cue:()=>{x:number;y:number;dir:number}|null;tick:(dt:number)=>void;select:(column:number)=>void;ready:()=>void;effect:(e:RunEvent)=>void;placing:()=>boolean;exitText:()=>string}
-const BLOCK_TYPES:BlockType[]=['dirt','stone','hard','gold','gem','tnt'];
+const BLOCK_TYPES:BlockType[]=['dirt','stone','hard','gold','gem','tnt','obsidian','bedrock'];
 export class MineScene extends Phaser.Scene {
  bridge:Bridge;g!:Phaser.GameObjects.Graphics;pick!:Phaser.GameObjects.Image;outline!:Phaser.GameObjects.Graphics;blocks:Phaser.GameObjects.Image[]=[];cracks:(Phaser.GameObjects.Image|undefined)[]=[];cave!:Phaser.GameObjects.TileSprite;lastRun='';acc=0;
  particles:{x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number}[]=[];
