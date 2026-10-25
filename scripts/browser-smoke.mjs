@@ -5,7 +5,7 @@ try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));
  await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#drop');
- await page.clock.install();await page.locator('#drop').click();await page.clock.runFor(23000);
+ await page.clock.install();await page.locator('#drop').click();await page.clock.runFor(30000);
  assert.equal(await page.evaluate(()=>window.shaft.run.status),'won');
  const coins=await page.evaluate(()=>window.shaft.progress.coins);assert.ok(coins>=60);
  await page.reload();await page.waitForSelector('#stage canvas');assert.equal(await page.evaluate(()=>window.shaft.progress.coins),coins);

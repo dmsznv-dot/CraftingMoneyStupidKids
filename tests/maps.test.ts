@@ -22,3 +22,8 @@ test('mid-run snapshot restores physical state and unspent charges',()=>{
  for(let i=0;i<20;i++){stepRun(restored.attempt,1/120);stepRun(r,1/120);}
  assert.ok(Math.abs(restored.attempt.y-r.y)<.01);
 });
+test('saves from before the lesson flag decode with the lesson still pending',()=>{
+ const old=freshProgress() as Partial<ReturnType<typeof freshProgress>>;delete old.tutorial;
+ assert.equal(decodeProgress(JSON.stringify(old))?.tutorial,false);
+ assert.equal(decodeProgress(JSON.stringify({...freshProgress(),tutorial:true}))?.tutorial,true);
+});

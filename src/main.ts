@@ -1,34 +1,38 @@
 import Phaser from 'phaser';
-import {createRun,stepRun,nudge,placeStarter,PICKS,LEVELS} from './core.ts';
+import {createRun,stepRun,nudge,placeStarter,fuseCue,PICKS,BLOCKS,LEVELS} from './core.ts';
 import type {Pick,Run,RunEvent} from './core.ts';
 import {buy,settle,reward,PRICES} from './progress.ts';
 import type {Item,Progress} from './progress.ts';
 import {SaveStore} from './storage.ts';
 import {Platform} from './platform.ts';
-import {messages} from './i18n.ts';
+import {messages,nudgeCount} from './i18n.ts';
 import type {Key} from './i18n.ts';
 import {AudioBus} from './audio.ts';
 import {MineScene} from './scene.ts';
+import {pickPixels,SIZE} from './textures.ts';
 import './style.css';
 
 const platform=new Platform(),store=new SaveStore(),audio=new AudioBus();
 const app=document.querySelector<HTMLDivElement>('#app')!;
 let p:Progress,r:Run,remote:Progress|null=null,screen='none',returnScreen='none',placing=false,lastSave=0,lastHud=0,transition=false;
-let game:Phaser.Game;let toastTimer:ReturnType<typeof setTimeout>;
+let game:Phaser.Game;let toastTimer:ReturnType<typeof setTimeout>;let warnedRun='';
 const t=(key:Key)=>messages[p.lang][key];
+// The first-nudge lesson runs until the player has spent a nudge once.
+let cueShown=false;
+const cue=()=>{const c=p.tutorial||platform.gate.paused?null:fuseCue(r,cueShown);cueShown=!!c;return c;};
 const pickKeys=Object.keys(PICKS) as Pick[];
 const svg=(name:string)=>{
  const paths:Record<string,string>={pause:'<path d="M8 5v14M16 5v14"/>',sound:'<path d="M4 9h4l5-4v14l-5-4H4zM17 8q6 4 0 8"/>',mute:'<path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6m0-6-5 6"/>',expand:'<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/>',back:'<path d="m14 6-6 6 6 6"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',left:'<path d="M19 12H5m6-6-6 6 6 6"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',lock:'<rect x="6" y="10" width="12" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',check:'<path d="m5 12 4 4 10-10"/>',spark:'<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>',mountain:'<path d="m2 19 7-12 4 6 3-5 6 11zM6 19l3-5 3 5"/>',workshop:'<path d="M3 19h18M5 19v-8l7-7 7 7v8M9 19v-6h6v6"/>'};
  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]??paths.spark)+'</svg>';
 };
 const nugget='<span class="nugget" aria-hidden="true"></span>';
-function pickIcon(key:Pick,size=''){return `<svg class="pick-icon ${size}" viewBox="0 0 64 64" aria-hidden="true"><path d="m18 50 29-29" stroke="#172a26" stroke-width="12"/><path d="m18 50 29-29" stroke="#a77447" stroke-width="8"/><path d="m17 49 28-28" stroke="#d1ac77" stroke-width="2"/><path d="m20 14 9-5 16 3 11 11-2 10-7-12-13-4z" fill="#${PICKS[key].color.toString(16)}" stroke="#172a26" stroke-width="3"/><path d="m23 14 8-3 13 3 6 6" stroke="#fff" stroke-opacity=".3" fill="none" stroke-width="2"/></svg>`;}
+function pickIcon(key:Pick,size=''){return `<svg class="pick-icon ${size}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${pickPixels(key).map((c,i)=>c?`<rect x="${i%SIZE}" y="${Math.floor(i/SIZE)}" width="1" height="1" fill="${c}"/>`:'').join('')}</svg>`;}
 function save(force=false){p.attempt=structuredClone(r);p.attempt.events=[];p.revision++;store.save(p);void store.flush(p,force);}
 function notify(text:string){const el=document.querySelector<HTMLElement>('#toast')!;el.textContent=text;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600);}
 function syncGate(){const active=r?.status==='playing'&&!platform.gate.paused;platform.gameplay(active);audio.pause(platform.gate.paused||!active);}
 function modal(next:string){screen=next;platform.gate.set('modal',next!=='none');syncGate();renderModal();}
 function prepare(level:number){placing=false;r=createRun(level,p.pick,p.enchant,p.owned.includes('starter'));modal('none');render();save();}
-function performNudge(dir:number){if(r.status!=='playing'||platform.gate.paused)return;if(nudge(r,dir)){audio.play('nudge');save();hud();}}
+function performNudge(dir:number){if(r.status!=='playing'||platform.gate.paused)return;if(nudge(r,dir)){audio.play('nudge');if(!p.tutorial){p.tutorial=true;notify(t('coachDone'));}save();hud();}}
 function start(){if(r.status!=='ready'||screen!=='none'||platform.busy)return;audio.unlock();r.status='playing';placing=false;syncGate();render();save();}
 function render(){
  document.documentElement.lang=p.lang;document.title=p.lang==='ru'?'Шахта импульсов':'Shaft & Impulse';
@@ -52,10 +56,10 @@ function render(){
  document.querySelector('#shop')!.innerHTML=`${svg('workshop')} ${t('shop')}`;
  document.querySelector('#levels')!.innerHTML=`${svg('mountain')} ${t('levels')}`;
  document.querySelector('#tnt-slot')!.innerHTML=p.owned.includes('starter')?`<button id="place-tnt" class="text-button" ${r.starterPlaced?'disabled':''}><span class="tnt-mini">TNT</span> ${r.starterPlaced?t('tntPlaced'):t('placeTnt')}</button>`:'';
- document.querySelector('#equipped-info')!.innerHTML=`${pickIcon(r.pick)}<div><b>${t(r.pick)}</b><small>${PICKS[r.pick].nudges} ${t('nudges').toLowerCase()}${p.enchant!=='none'?' · '+t(p.enchant):''}</small></div>`;
+ document.querySelector('#equipped-info')!.innerHTML=`${pickIcon(r.pick)}<div><b>${t(r.pick)}</b><small>${nudgeCount(p.lang,PICKS[r.pick].nudges)}${p.enchant!=='none'?' · '+t(p.enchant):''}</small></div>`;
  document.querySelector('#controls')!.classList.toggle('dormant',!playing);
  document.querySelector('#controls-title')!.textContent=PICKS[r.pick].nudges?t('nudges'):t('auto');
- document.querySelector('#control-hint')!.textContent=PICKS[r.pick].nudges?t('stoneHint'):t('autoHint');
+ document.querySelector('#control-hint')!.textContent=PICKS[r.pick].nudges?`${nudgeCount(p.lang,PICKS[r.pick].nudges)} ${t('perDrop')}. ${t('stoneHint')}`:t('autoHint');
  document.querySelector('#left')!.innerHTML=svg('left');document.querySelector('#right')!.innerHTML=svg('arrow');
  document.querySelector('#left')!.setAttribute('aria-label',t('left'));document.querySelector('#right')!.setAttribute('aria-label',t('right'));
  document.querySelector('#local-mode')!.textContent=platform.sdk?'':t('local');
@@ -70,6 +74,8 @@ function hud(){
  document.querySelector('#charges')!.innerHTML=Array.from({length:Math.max(1,PICKS[r.pick].nudges)},(_,i)=>`<i class="${i<r.nudges?'lit':''}"></i>`).join('');
  document.querySelector('#charge-count')!.textContent=PICKS[r.pick].nudges?`${r.nudges} / ${PICKS[r.pick].nudges}`:'—';
  for(const id of ['left','right'])document.querySelector<HTMLButtonElement>('#'+id)!.disabled=r.status!=='playing'||!r.nudges||platform.gate.paused;
+ const c=cue(),coach=document.querySelector<HTMLElement>('#coach')!;coach.classList.toggle('show',!!c);if(c)coach.textContent=t(c.dir<0?'coachLeft':'coachRight');
+ document.querySelector('#left')!.classList.toggle('coach',c?.dir===-1);document.querySelector('#right')!.classList.toggle('coach',c?.dir===1);
  if(store.error)document.querySelector('#local-mode')!.textContent=t('saveError');
 }
 function closeButton(){return `<button class="icon-button close" data-action="close" aria-label="${t('close')}">${svg('close')}</button>`;}
@@ -127,7 +133,8 @@ function tick(dt:number){
  if(r.status!=='playing'||platform.gate.paused)return;
  if(r.time<lastSave)lastSave=0;
  if(r.time<lastHud)lastHud=0;
- stepRun(r,dt);platform.activeSeconds+=dt;
+ const lesson=!!cue();stepRun(r,lesson?dt*.35:dt);platform.activeSeconds+=dt;
+ if(lesson!==!!cue())hud();
  const outcome=(r as Run).status;
  if(outcome==='won'||outcome==='lost'){
   settle(p,r);save(true);audio.play(outcome==='won'?'win':'hit');modal('result');render();
@@ -140,14 +147,18 @@ function select(column:number){
  if(placing){placeStarter(r,column);placing=false;render();}else r.x=column*32+16;
  save();
 }
-function effect(e:RunEvent){if(e.type==='blast')audio.play('blast');else if(e.type==='break'&&e.value)audio.play('ore');else if(e.type==='hit')audio.play('hit');}
+function effect(e:RunEvent){
+ if(e.type==='blast')audio.play('blast');else if(e.type==='break'&&e.value)audio.play('ore');else if(e.type==='hit')audio.play(e.weak?'clank':'hit');
+ // Once per descent, name the pick that would mine the block that just stopped this one.
+ if(e.type==='hit'&&e.weak&&e.kind&&warnedRun!==r.id){warnedRun=r.id;const need=pickKeys.find(k=>PICKS[k].tier>=BLOCKS[e.kind!].tier)!;notify(t('tooHard').replace('{pick}',t(need).toLowerCase()));}
+}
 async function boot(){
  await platform.init();const loaded=await store.load(platform.player);p=loaded.local;remote=loaded.remote;
  if(!loaded.hasLocal&&!loaded.remote)p.lang=platform.language==='en'?'en':'ru';
  audio.enabled=p.sound;
  r=p.attempt??createRun(p.unlocked,p.pick,p.enchant,p.owned.includes('starter'));
- app.innerHTML=`<div class="game-shell"><header class="topbar"><div id="brand" class="brand"></div><div class="top-actions"><div class="wallet"><div id="wallet-label"></div><span>${nugget}<b id="wallet">0</b></span></div><button id="language" class="icon-button"></button><button id="sound" class="icon-button"></button><button id="fullscreen" class="icon-button"></button></div></header><main class="mine-frame"><div id="stage"></div><div class="vignette"></div><div class="level-heading"><span id="level-no" class="eyebrow"></span><h1 id="level-name"></h1></div><button id="pause" class="icon-button pause"></button><div class="hud"><div class="hud-stat"><label id="hud-label-depth"></label><b id="depth">0%</b></div><div class="hud-stat hp-stat"><label id="hud-label-hp"></label><b id="hp"></b><div class="hp-track"><div id="hp-fill"></div></div></div><div class="hud-stat"><label id="hud-label-ore"></label><b id="ore">0</b></div></div><section id="prep" class="preparation"><div id="equipped-info" class="equipped-info"></div><div class="prep-text"><h2 id="pretitle"></h2><p id="prehint"></p></div><div id="tnt-slot"></div><button id="drop" class="primary drop-button"></button><div class="prep-links"><button id="shop" class="text-button"></button><button id="levels" class="text-button"></button></div></section><div id="modal" class="modal-layer hidden"></div></main><footer class="controls" id="controls"><button id="left" class="nudge-button"></button><div class="control-center"><div class="control-label"><b id="controls-title"></b><span id="charge-count"></span></div><div id="charges" class="charges"></div><p id="control-hint"></p></div><button id="right" class="nudge-button"></button></footer><div id="local-mode" class="local-mode"></div><div id="toast" role="status"></div></div>`;
- const scene=new MineScene({run:()=>r,tick,select,effect,placing:()=>placing,exitText:()=>t('exit'),ready:()=>{render();platform.ready();}});
+ app.innerHTML=`<div class="game-shell"><header class="topbar"><div id="brand" class="brand"></div><div class="top-actions"><div class="wallet"><div id="wallet-label"></div><span>${nugget}<b id="wallet">0</b></span></div><button id="language" class="icon-button"></button><button id="sound" class="icon-button"></button><button id="fullscreen" class="icon-button"></button></div></header><main class="mine-frame"><div id="stage"></div><div class="vignette"></div><div class="level-heading"><span id="level-no" class="eyebrow"></span><h1 id="level-name"></h1></div><button id="pause" class="icon-button pause"></button><div class="hud"><div class="hud-stat"><label id="hud-label-depth"></label><b id="depth">0%</b></div><div class="hud-stat hp-stat"><label id="hud-label-hp"></label><b id="hp"></b><div class="hp-track"><div id="hp-fill"></div></div></div><div class="hud-stat"><label id="hud-label-ore"></label><b id="ore">0</b></div></div><section id="prep" class="preparation"><div id="equipped-info" class="equipped-info"></div><div class="prep-text"><h2 id="pretitle"></h2><p id="prehint"></p></div><div id="tnt-slot"></div><button id="drop" class="primary drop-button"></button><div class="prep-links"><button id="shop" class="text-button"></button><button id="levels" class="text-button"></button></div></section><div id="coach" class="coach-callout" aria-live="polite"></div><div id="modal" class="modal-layer hidden"></div></main><footer class="controls" id="controls"><button id="left" class="nudge-button"></button><div class="control-center"><div class="control-label"><b id="controls-title"></b><span id="charge-count"></span></div><div id="charges" class="charges"></div><p id="control-hint"></p></div><button id="right" class="nudge-button"></button></footer><div id="local-mode" class="local-mode"></div><div id="toast" role="status"></div></div>`;
+ const scene=new MineScene({run:()=>r,cue,tick,select,effect,placing:()=>placing,exitText:()=>t('exit'),ready:()=>{render();platform.ready();}});
  game=new Phaser.Game({type:Phaser.AUTO,parent:'stage',backgroundColor:'#102220',pixelArt:true,antialias:false,scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true},render:{roundPixels:true},fps:{target:60}});
  platform.gate.listeners.add(()=>{syncGate();hud();});
  document.querySelector('#drop')!.addEventListener('click',start);
