@@ -1,7 +1,7 @@
 name: Deploy game preview to GitHub Pages
 on:
   push:
-    branches: [codex/progression-45-mines]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
