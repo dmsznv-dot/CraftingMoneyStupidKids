@@ -3,6 +3,12 @@ import type {BlockType} from './core.ts';
 export type Sound='hit'|'clank'|'ore'|'blast'|'fuse'|'nudge'|'win'|'break';
 // filter: band centre; q: resonance; decay: seconds; gain: loudness; grains: crunch repeats on a break.
 const MATERIAL:Record<BlockType,{filter:number;q:number;decay:number;gain:number;type:BiquadFilterType}>={
+ coal:{filter:1100,q:1,decay:.06,gain:.4,type:'bandpass'},
+ copper:{filter:1950,q:1.4,decay:.06,gain:.4,type:'bandpass'},
+ iron:{filter:2100,q:1.5,decay:.06,gain:.4,type:'bandpass'},
+ emerald:{filter:2600,q:1.8,decay:.08,gain:.4,type:'bandpass'},
+ double:{filter:2800,q:1.8,decay:.1,gain:.4,type:'bandpass'},
+ sweep:{filter:1400,q:1.2,decay:.1,gain:.4,type:'bandpass'},
  dirt:{filter:420,q:.7,decay:.07,gain:.5,type:'lowpass'},
  stone:{filter:1700,q:1.1,decay:.06,gain:.45,type:'bandpass'},
  gold:{filter:1900,q:1.3,decay:.06,gain:.45,type:'bandpass'},

@@ -3,10 +3,11 @@ import {COLS,TILE,WIDTH,PICKS,BLOCKS,BLAST_RADIUS} from './core.ts';
 import {blockPixels,crackPixels,pickPixels,paint,DEBRIS,CRACK_STAGES} from './textures.ts';
 import type {Run,RunEvent,BlockType,Pick} from './core.ts';
 export interface Bridge {run:()=>Run;cue:()=>{x:number;y:number;dir:number}|null;tick:(dt:number)=>void;select:(column:number)=>void;ready:()=>void;effect:(e:RunEvent)=>void;placing:()=>boolean;exitText:()=>string}
-const BLOCK_TYPES:BlockType[]=['dirt','stone','hard','gold','gem','tnt','obsidian','bedrock'];
+const BLOCK_TYPES=Object.keys(BLOCKS) as BlockType[];
 export class MineScene extends Phaser.Scene {
  bridge:Bridge;g!:Phaser.GameObjects.Graphics;pick!:Phaser.GameObjects.Image;outline!:Phaser.GameObjects.Graphics;blocks:Phaser.GameObjects.Image[]=[];cracks:(Phaser.GameObjects.Image|undefined)[]=[];cave!:Phaser.GameObjects.TileSprite;lastRun='';acc=0;
  particles:{x:number;y:number;vx:number;vy:number;life:number;max:number;color:number;size:number}[]=[];
+ labels:Phaser.GameObjects.Text[]=[];
  rings:{x:number;y:number;life:number;color:number;size:number}[]=[];viewZoom=1;cachedHp:number[]=[];
  constructor(bridge:Bridge){super('mine');this.bridge=bridge;}
  create(){
@@ -33,7 +34,7 @@ export class MineScene extends Phaser.Scene {
  update(_time:number,delta:number){
   this.acc+=Math.min(delta/1000,.1);while(this.acc>=1/120){this.bridge.tick(1/120);this.acc-=1/120;}
   const r=this.bridge.run(),cam=this.cameras.main;
-  if(this.lastRun!==r.id){for(const b of this.blocks)b.destroy();for(const c of this.cracks)c?.destroy();this.blocks=[];this.cracks=[];this.cachedHp=[];this.cave.setSize(WIDTH,r.rows*TILE-128);this.lastRun=r.id;this.particles=[];this.rings=[];}
+  if(this.lastRun!==r.id){for(const b of this.blocks)b.destroy();for(const c of this.cracks)c?.destroy();this.blocks=[];this.cracks=[];this.cachedHp=[];this.cave.setSize(WIDTH,r.rows*TILE-128);this.lastRun=r.id;this.particles=[];this.rings=[];for(const label of this.labels)label.destroy();this.labels=[];}
   const targetY=r.status==='ready'?180:Math.max(180,r.y+125);
   cam.centerOn(WIDTH/2,targetY);
   this.drawBackdrop(r);
@@ -50,7 +51,7 @@ export class MineScene extends Phaser.Scene {
   }
   // Lit TNT flashes white until its fuse runs out.
   for(const f of r.fuses){const i=r.blocks.findIndex(b=>b.x===f.x&&b.y===f.y);const img=this.blocks[i];if(img){if(Math.floor(this.time.now/70)%2)img.setTintFill(0xffffff);else img.clearTint();}}
-  this.pick.setTexture('pick-'+r.pick).setPosition(r.x,r.y).setRotation(r.angle).setVisible(r.status!=='lost');
+  this.pick.setTexture('pick-'+r.pick).setPosition(r.x,r.y).setRotation(r.angle-Math.PI/2).setVisible(r.status!=='lost');
   for(const e of r.events.splice(0)){this.fx(e);this.bridge.effect(e);}
   const dt=Math.min(delta/1000,.05);const g=this.outline;g.clear();
   for(const p of this.particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=200*dt;g.fillStyle(p.color,Math.max(0,p.life/p.max));g.fillRect(p.x,p.y,p.size,p.size);}
@@ -89,6 +90,16 @@ export class MineScene extends Phaser.Scene {
  }
  fx(e:RunEvent){
   const r=this.bridge.run(),tier=PICKS[r.pick].tier;
+  if(e.type==='break'&&e.value){
+   const label=this.add.text(e.x,e.y-10,'+'+e.value,{fontFamily:'Arial',fontSize:e.value>=10?'20px':'17px',fontStyle:'bold',color:'#ffe59d',stroke:'#1b2017',strokeThickness:4}).setOrigin(.5).setDepth(9);
+   this.labels.push(label);this.tweens.add({targets:label,y:e.y-65,alpha:0,duration:950,ease:'Cubic.easeOut',onComplete:()=>{label.destroy();this.labels=this.labels.filter(l=>l!==label);}});
+   this.rings.push({x:e.x,y:e.y,life:.35,color:0xffdb81,size:25});
+  }
+  if(e.type==='bonus'){
+   const label=this.add.text(e.x,e.y,e.kind==='double'?'×2':'↔',{fontFamily:'Arial',fontSize:'28px',fontStyle:'bold',color:e.kind==='double'?'#e5c4ff':'#b1f7f5',stroke:'#17221d',strokeThickness:4}).setOrigin(.5).setDepth(9);
+   this.labels.push(label);this.tweens.add({targets:label,y:e.y-70,alpha:0,duration:1300,onComplete:()=>{label.destroy();this.labels=this.labels.filter(l=>l!==label);}});
+   if(e.kind==='sweep')for(let x=8;x<WIDTH;x+=16)this.particles.push({x,y:e.y,vx:0,vy:-60,life:.6,max:.6,color:0x9de4e4,size:5});
+  }
   if(e.type==='blast'){this.rings.push({x:e.x,y:e.y,life:.55,color:0xf6c96f,size:BLAST_RADIUS+14});if(!matchMedia('(prefers-reduced-motion: reduce)').matches)this.cameras.main.shake(90,.002);}
   if(e.type==='fuse')this.rings.push({x:e.x,y:e.y,life:.3,color:0xffffff,size:20});
   if(e.type==='nudge')this.rings.push({x:e.x,y:e.y,life:.38,color:0x8ae2c4,size:90});

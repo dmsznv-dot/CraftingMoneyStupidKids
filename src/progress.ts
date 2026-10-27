@@ -3,10 +3,10 @@ import type {Pick,Enchant,Run} from './core.ts';
 export type Item=Pick|'starter'|'wave'|'chain';
 export interface Receipt {amount:number;rewarded:boolean}
 export interface Progress {version:1;coins:number;owned:Item[];pick:Pick;enchant:Enchant;unlocked:number;best:number[];receipts:Record<string,Receipt>;lang:'ru'|'en';sound:boolean;tutorial:boolean;revision:number;attempt:Run|null}
-export function freshProgress():Progress{return{version:1,coins:0,owned:['wood'],pick:'wood',enchant:'none',unlocked:0,best:Array(12).fill(0),receipts:{},lang:'ru',sound:true,tutorial:false,revision:0,attempt:null};}
-// Each pick costs five times the previous one; deeper mines pay far more, so the next pick is earned deeper down.
-export const PRICES:Record<Item,number>={wood:PICKS.wood.price,stone:PICKS.stone.price,iron:PICKS.iron.price,gold:PICKS.gold.price,diamond:PICKS.diamond.price,starter:120,wave:500,chain:1500};
-export const levelReward=(level:number)=>Math.round(10*1.3**level);
+export function freshProgress():Progress{return{version:1,coins:0,owned:['wood'],pick:'wood',enchant:'none',unlocked:0,best:Array(LEVELS.length).fill(0),receipts:{},lang:'ru',sound:true,tutorial:false,revision:0,attempt:null};}
+// Smooth bounded rewards; early ore makes the first permanent upgrade reachable quickly.
+export const PRICES:Record<Item,number>={wood:PICKS.wood.price,stone:PICKS.stone.price,iron:PICKS.iron.price,gold:PICKS.gold.price,diamond:PICKS.diamond.price,obsidian:PICKS.obsidian.price,netherite:PICKS.netherite.price,starter:120,wave:500,chain:1500};
+export const levelReward=(level:number)=>12+Math.max(0,Math.min(44,Math.floor(level)))*4+Math.floor(Math.max(0,Math.min(44,level))/9)*12;
 export function buy(p:Progress,item:Item):boolean {
  if(p.owned.includes(item)||!(item in PRICES)||p.coins<PRICES[item])return false;
  const picks=Object.keys(PICKS) as Pick[],index=picks.indexOf(item as Pick);

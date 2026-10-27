@@ -46,9 +46,10 @@ function render(){
  document.querySelector<HTMLButtonElement>('#pause')!.disabled=!playing;
  document.querySelector<HTMLButtonElement>('#language')!.disabled=playing;
  document.querySelector('#level-name')!.textContent=t((LEVELS[r.level].name==='chain'?'chainLevel':LEVELS[r.level].name) as Key);
- document.querySelector('#level-no')!.textContent=`${t('level')} ${String(r.level+1).padStart(2,'0')} / 12`;
+ document.querySelector('#stratum')!.textContent=`${t('chapter')} ${LEVELS[r.level].chapter+1} / 5`;
+ document.querySelector('#level-no')!.textContent=`${t('level')} ${String(r.level+1).padStart(2,'0')} / ${LEVELS.length}`;
  document.querySelector('#hud-label-depth')!.textContent=t('depth');document.querySelector('#hud-label-hp')!.textContent=t('durability');
- document.querySelector('#hud-label-ore')!.textContent=t('ore');
+ document.querySelector('#hud-label-ore')!.textContent=t('runOre');
  document.querySelector('#prep')!.classList.toggle('hidden',r.status!=='ready');
  document.querySelector('#pretitle')!.textContent=placing?t('tntHint'):t('prepare');
  document.querySelector('#prehint')!.textContent=placing?'':t('prepareHint');
@@ -69,6 +70,7 @@ function hud(){
  document.querySelector('#wallet')!.textContent=String(p.coins);
  const depth=Math.max(0,Math.min(100,Math.floor((r.y-64)/(r.rows*32-64)*100)));
  document.querySelector('#depth')!.textContent=depth+'%';document.querySelector('#ore')!.textContent=String(r.ore);
+ const bonus=document.querySelector<HTMLElement>('#bonus-counter')!;bonus.textContent=r.doubleLeft?`×2 · ${r.doubleLeft}/5`:'';bonus.classList.toggle('hidden',!r.doubleLeft);
  document.querySelector('#hp')!.textContent=String(Math.ceil(r.hp))+'/'+PICKS[r.pick].hp;
  const bar=document.querySelector<HTMLElement>('#hp-fill')!;bar.style.width=(r.hp/PICKS[r.pick].hp*100)+'%';bar.classList.toggle('low',r.hp/PICKS[r.pick].hp<.25);
  document.querySelector('#charges')!.innerHTML=Array.from({length:Math.max(1,PICKS[r.pick].nudges)},(_,i)=>`<i class="${i<r.nudges?'lit':''}"></i>`).join('');
@@ -92,12 +94,12 @@ function renderModal(){
    return `<article class="upgrade"><div class="upgrade-icon">${key==='starter'?'<span class="tnt-mini">TNT</span>':svg('spark')}</div><div><b>${t(key as Key)}</b><p>${t((key+'Desc') as Key)}</p></div><button class="secondary" data-item="${key}" ${selected||!owned&&p.coins<PRICES[key]?'disabled':''}>${selected?svg('check'):owned?t('equip'):nugget+PRICES[key]}</button></article>`;
   }).join('')}</div>${p.enchant!=='none'?`<button class="text-button" data-action="unequip">${t('none')}</button>`:''}<p class="fine">${t('enchants')}</p></div>`;
  }else if(screen==='levels'){
-  content=`<div class="modal-panel">${closeButton()}<span class="eyebrow">12 ${t('level')}</span><h2>${t('levels')}</h2><div class="level-grid">${LEVELS.map((l,i)=>`<button class="level-card ${i===r.level?'selected':''}" data-level="${i}" ${i>p.unlocked?'disabled':''}><strong>${i<=p.unlocked?String(i+1).padStart(2,'0'):svg('lock')}</strong><span>${t((l.name==='chain'?'chainLevel':l.name) as Key)}</span><small class="level-reward">${nugget} +${levelReward(i)}</small><small>${i<=p.unlocked?`${t('best')}: ${p.best[i]}`:t('locked')}</small></button>`).join('')}</div></div>`;
+  content=`<div class="modal-panel">${closeButton()}<span class="eyebrow">${LEVELS.length} ${t('level')}</span><h2>${t('levels')}</h2><div class="level-grid">${LEVELS.map((l,i)=>`${i%9===0?`<h3 class="chapter-title">${t('chapter')} ${l.chapter+1}</h3>`:''}<button class="level-card ${i===r.level?'selected':''}" data-level="${i}" ${i>p.unlocked?'disabled':''}><strong>${i<=p.unlocked?String(i+1).padStart(2,'0'):svg('lock')}</strong><span>${t((l.name==='chain'?'chainLevel':l.name) as Key)}</span><small class="level-reward">${nugget} +${levelReward(i)}</small><small>${i<=p.unlocked?`${t('best')}: ${p.best[i]}`:t('locked')}</small></button>`).join('')}</div></div>`;
  }else if(screen==='pause'){
   content=`<div class="modal-panel compact">${closeButton()}<div class="result-mark">${svg('pause')}</div><h2>${t('paused')}</h2><p class="muted">${t('pausedHint')}</p><button class="primary" data-action="resume">${t('resume')}${svg('arrow')}</button><button class="secondary" data-action="restart">${t('restart')}</button></div>`;
  }else if(screen==='result'){
   const won=r.status==='won',receipt=p.receipts[r.id];
-  content=`<div class="modal-panel compact result"><span class="eyebrow">${t('level')} ${String(r.level+1).padStart(2,'0')}</span><div class="result-mark ${won?'success':''}">${svg(won?'check':'mountain')}</div><h2>${t(won?'won':'lost')}</h2><p class="muted">${t(won&&r.level===11?'finalHint':won?'wonHint':'lostHint')}</p>${won?`<div class="reward-detail"><span>${t('base')}</span><b>+${levelReward(r.level)}</b><span>${t('oreBonus')}</span><b>+${r.ore}</b></div><div class="reward-total">${nugget}<strong>+${receipt?.amount??0}</strong><span>${t('total')}</span></div>`:''}<button class="primary" data-action="${won&&r.level<11?'next':'restart'}">${t(won&&r.level<11?'next':'again')}${svg('arrow')}</button>${won?`<button class="secondary ad-button" data-action="reward" ${receipt?.rewarded||platform.busy?'disabled':''}>${svg('spark')}${t(receipt?.rewarded?'bonusDone':'ad')}</button>`:''}<button class="text-button" data-action="workshop">${svg('workshop')}${t('shop')}</button></div>`;
+  content=`<div class="modal-panel compact result"><span class="eyebrow">${t('level')} ${String(r.level+1).padStart(2,'0')}</span><div class="result-mark ${won?'success':''}">${svg(won?'check':'mountain')}</div><h2>${t(won?'won':'lost')}</h2><p class="muted">${t(won&&r.level===LEVELS.length-1?'finalHint':won?'wonHint':'lostHint')}</p>${won?`<div class="reward-detail"><span>${t('base')}</span><b>+${levelReward(r.level)}</b><span>${t('oreBonus')}</span><b>+${r.ore}</b></div><div class="reward-total">${nugget}<strong>+${receipt?.amount??0}</strong><span>${t('total')}</span></div>`:''}<button class="primary" data-action="${won&&r.level<LEVELS.length-1?'next':'restart'}">${t(won&&r.level<LEVELS.length-1?'next':'again')}${svg('arrow')}</button>${won?`<button class="secondary ad-button" data-action="reward" ${receipt?.rewarded||platform.busy?'disabled':''}>${svg('spark')}${t(receipt?.rewarded?'bonusDone':'ad')}</button>`:''}<button class="text-button" data-action="workshop">${svg('workshop')}${t('shop')}</button></div>`;
  }else if(screen==='restore'){
   content=`<div class="modal-panel compact"><div class="result-mark">${pickIcon(r.pick)}</div><h2>${t('continueRun')}</h2><p class="muted">${t('continueHint')}</p><button class="primary" data-action="restore">${t('resume')}${svg('arrow')}</button><button class="secondary" data-action="restart">${t('restart')}</button></div>`;
  }else if(screen==='conflict'){
@@ -108,7 +110,7 @@ function renderModal(){
 }
 async function navigate(next:boolean){
  if(transition||platform.busy)return;transition=true;
- await platform.advert();prepare(next?Math.min(11,r.level+1):r.level);transition=false;
+ await platform.advert();prepare(next?Math.min(LEVELS.length-1,r.level+1):r.level);transition=false;
 }
 async function handleAction(action:string){
  audio.unlock();
@@ -148,6 +150,8 @@ function select(column:number){
  save();
 }
 function effect(e:RunEvent){
+ if(e.type==='break'&&e.value){const el=document.querySelector('#ore')!;el.classList.remove('ore-pulse');void (el as HTMLElement).offsetWidth;el.classList.add('ore-pulse');}
+ if(e.type==='bonus'){notify(t(e.kind==='double'?'doubleBonus':'sweepBonus'));audio.play('ore');hud();}
  if(e.type==='blast')audio.play('blast');else if(e.type==='fuse')audio.play('fuse');
  else if(e.type==='break'){audio.play('break',e.kind);if(e.value)audio.play('ore');}
  else if(e.type==='hit')audio.play(e.weak?'clank':'hit',e.kind);
@@ -159,7 +163,7 @@ async function boot(){
  if(!loaded.hasLocal&&!loaded.remote)p.lang=platform.language==='en'?'en':'ru';
  audio.enabled=p.sound;
  r=p.attempt??createRun(p.unlocked,p.pick,p.enchant,p.owned.includes('starter'));
- app.innerHTML=`<div class="game-shell"><header class="topbar"><div id="brand" class="brand"></div><div class="top-actions"><div class="wallet"><div id="wallet-label"></div><span>${nugget}<b id="wallet">0</b></span></div><button id="language" class="icon-button"></button><button id="sound" class="icon-button"></button><button id="fullscreen" class="icon-button"></button></div></header><main class="mine-frame"><div id="stage"></div><div class="vignette"></div><div class="level-heading"><span id="level-no" class="eyebrow"></span><h1 id="level-name"></h1></div><button id="pause" class="icon-button pause"></button><div class="hud"><div class="hud-stat"><label id="hud-label-depth"></label><b id="depth">0%</b></div><div class="hud-stat hp-stat"><label id="hud-label-hp"></label><b id="hp"></b><div class="hp-track"><div id="hp-fill"></div></div></div><div class="hud-stat"><label id="hud-label-ore"></label><b id="ore">0</b></div></div><section id="prep" class="preparation"><div id="equipped-info" class="equipped-info"></div><div class="prep-text"><h2 id="pretitle"></h2><p id="prehint"></p></div><div id="tnt-slot"></div><button id="drop" class="primary drop-button"></button><div class="prep-links"><button id="shop" class="text-button"></button><button id="levels" class="text-button"></button></div></section><div id="coach" class="coach-callout" aria-live="polite"></div><div id="modal" class="modal-layer hidden"></div></main><footer class="controls" id="controls"><button id="left" class="nudge-button"></button><div class="control-center"><div class="control-label"><b id="controls-title"></b><span id="charge-count"></span></div><div id="charges" class="charges"></div><p id="control-hint"></p></div><button id="right" class="nudge-button"></button></footer><div id="local-mode" class="local-mode"></div><div id="toast" role="status"></div></div>`;
+ app.innerHTML=`<div class="game-shell"><header class="topbar"><div id="brand" class="brand"></div><div class="top-actions"><div class="wallet"><div id="wallet-label"></div><span>${nugget}<b id="wallet">0</b></span></div><button id="language" class="icon-button"></button><button id="sound" class="icon-button"></button><button id="fullscreen" class="icon-button"></button></div></header><main class="mine-frame"><div id="stage"></div><div class="vignette"></div><div class="level-heading"><span id="level-no" class="eyebrow"></span><h1 id="level-name"></h1><small id="stratum"></small></div><button id="pause" class="icon-button pause"></button><div class="hud"><div class="hud-stat"><label id="hud-label-depth"></label><b id="depth">0%</b></div><div class="hud-stat hp-stat"><label id="hud-label-hp"></label><b id="hp"></b><div class="hp-track"><div id="hp-fill"></div></div></div><div class="hud-stat"><label id="hud-label-ore"></label><b id="ore">0</b><span id="bonus-counter" class="hidden"></span></div></div><section id="prep" class="preparation"><div id="equipped-info" class="equipped-info"></div><div class="prep-text"><h2 id="pretitle"></h2><p id="prehint"></p></div><div id="tnt-slot"></div><button id="drop" class="primary drop-button"></button><div class="prep-links"><button id="shop" class="text-button"></button><button id="levels" class="text-button"></button></div></section><div id="coach" class="coach-callout" aria-live="polite"></div><div id="modal" class="modal-layer hidden"></div></main><footer class="controls" id="controls"><button id="left" class="nudge-button"></button><div class="control-center"><div class="control-label"><b id="controls-title"></b><span id="charge-count"></span></div><div id="charges" class="charges"></div><p id="control-hint"></p></div><button id="right" class="nudge-button"></button></footer><div id="local-mode" class="local-mode"></div><div id="toast" role="status"></div></div>`;
  const scene=new MineScene({run:()=>r,cue,tick,select,effect,placing:()=>placing,exitText:()=>t('exit'),ready:()=>{render();platform.ready();}});
  game=new Phaser.Game({type:Phaser.AUTO,parent:'stage',backgroundColor:'#102220',pixelArt:true,antialias:false,scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:[scene],audio:{noAudio:true},render:{roundPixels:true},fps:{target:60}});
  platform.gate.listeners.add(()=>{syncGate();hud();});

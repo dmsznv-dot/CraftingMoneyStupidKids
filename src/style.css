@@ -10,3 +10,17 @@
 @keyframes coach-pulse{from{box-shadow:inset 0 -4px #172a20,0 0 0 0 #f3ce7700}to{box-shadow:inset 0 -4px #172a20,0 0 0 7px #f3ce7744}}
 @media(prefers-reduced-motion:reduce){.nudge-button.coach{animation:none;box-shadow:inset 0 -4px #172a20,0 0 0 4px #f3ce7766}}
 .level-reward{display:flex;align-items:center;gap:6px;color:#e4ce8f!important}.level-reward .nugget{width:14px;height:10px}
+
+/* Progression feedback stays at the edges; floating ore labels live in Phaser. */
+#stratum{display:block;font:9px var(--sans);letter-spacing:.18em;color:#98b1a2;margin-top:9px}
+#bonus-counter{display:inline-block;margin-top:8px;padding:5px 8px;border:1px solid #9b7ab8;background:#49325a;color:#e1c4fa;border-radius:5px;font:11px var(--sans);white-space:nowrap}
+.chapter-title{grid-column:1/-1;margin:15px 0 2px;color:#cfb777}
+.ore-pulse{animation:ore-pop .32s ease-out}
+@keyframes ore-pop{0%{color:#fff4bb;transform:scale(1.2);text-shadow:0 0 14px #ffd870}100%{transform:scale(1)}}
+.pick-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tool-card>.pick-icon{width:70px;height:70px}
+.tool-card p{min-height:45px}
+@media(max-width:700px){.pick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#stratum{font-size:8px}.hud-stat{width:88px}#hud-label-ore{font-size:6px}}
+@media(prefers-reduced-motion:reduce){.ore-pulse{animation:none}}
+@media(max-width:700px){.hud{top:105px}}
+@media(max-height:650px){#stratum{display:none}.hud{top:82px}}
