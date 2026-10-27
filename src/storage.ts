@@ -1,19 +1,40 @@
-import {freshProgress} from './progress.ts';
+import {normalizeRunAchievements,restoreAchievements} from './achievements.ts';
+import {AURAS,freshProgress} from './progress.ts';
 import type {Progress,Item} from './progress.ts';
 import {PICKS,BLOCKS,COLS,LEVELS} from './core.ts';
 import type {Run,BlockType} from './core.ts';
 import type {Player} from 'ysdk';
 const items=['wood','stone','iron','gold','diamond','obsidian','netherite','starter','wave','chain'];
-const finite=(v:unknown)=>typeof v==='number'&&Number.isFinite(v);
+const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
+function migrateDurability(r:Run){
+ const version=r.durabilityVersion??0;
+ if(version<2){
+  if(finite(r.hp))r.hp/=2;
+  if(finite(r.hpBonus))r.hpBonus=Math.round(r.hpBonus/2);
+  if(finite(r.magnetTime)&&r.magnetTime>=0&&r.magnetTime<=10)r.magnetTime=Math.min(3,r.magnetTime);
+ }
+ if(version<3){if(finite(r.hp))r.hp/=2;if(finite(r.hpBonus))r.hpBonus=Math.round(r.hpBonus/2);}
+ if(version<4){if(finite(r.hp))r.hp*=2;if(finite(r.hpBonus))r.hpBonus*=2;}
+ r.durabilityVersion=4;
+}
+function migrateHelmet(r:Run){
+ if(r.helmetCollected!==undefined)return;
+ r.helmetCollected=!!r.helmetReady;
+ // Older helmets granted this durability immediately when picked up.
+ if(r.helmetReady){
+  const oldBonus=Math.ceil(PICKS[r.pick].hp*.25);
+  if((r.hpBonus??0)>=oldBonus){r.hpBonus=(r.hpBonus??0)-oldBonus;r.hp=Math.max(1,r.hp-oldBonus);}
+ }
+}
 export function validRun(r:unknown):r is Run {
  if(!r||typeof r!=='object')return false;const s=r as Run;
- return s.version===1&&typeof s.id==='string'&&Number.isInteger(s.level)&&s.level>=0&&s.level<LEVELS.length&&s.pick in PICKS&&['none','wave','chain'].includes(s.enchant)
-  &&s.rows===LEVELS[s.level].rows&&Array.isArray(s.blocks)&&s.blocks.length<=1600
+ return s.version===1&&s.durabilityVersion===4&&typeof s.id==='string'&&Number.isInteger(s.level)&&s.level>=0&&s.level<LEVELS.length&&s.pick in PICKS&&['none','wave','chain'].includes(s.enchant)
+  &&(s.mode==='endless'?Number.isSafeInteger(s.rows)&&s.rows>=LEVELS[s.level].rows&&s.rows<=120000:s.mode===undefined||s.mode==='campaign'?s.rows===LEVELS[s.level].rows:false)&&Array.isArray(s.blocks)&&s.blocks.length<=4000
   &&s.blocks.every(b=>b&&Number.isInteger(b.x)&&b.x>=0&&b.x<COLS&&Number.isInteger(b.y)&&b.y>=0&&b.y<s.rows&&Object.hasOwn(BLOCKS,b.type)&&finite(b.hp)&&b.hp>=0&&b.hp<=BLOCKS[b.type as BlockType].hp)
   &&(s.fuses===undefined||Array.isArray(s.fuses)&&s.fuses.length<=40&&s.fuses.every(f=>f&&Number.isInteger(f.x)&&Number.isInteger(f.y)&&finite(f.t)))
   &&['ready','playing','won','lost'].includes(s.status)&&[s.x,s.y,s.vx,s.vy,s.angle,s.spin,s.hp,s.time,s.ore,s.lastNudge,s.lastHit,s.hits,s.nudges].every(finite)
-  &&Number.isInteger(s.doubleLeft)&&s.doubleLeft>=0&&s.doubleLeft<=5
-  &&s.x>=0&&s.x<=448&&s.y>=0&&s.y<=s.rows*32+300&&s.hp>=0&&s.hp<=PICKS[s.pick].hp&&Number.isInteger(s.nudges)&&s.nudges>=0&&s.nudges<=PICKS[s.pick].nudges&&s.ore>=0;
+  &&Number.isInteger(s.doubleLeft)&&s.doubleLeft>=0&&s.doubleLeft<=5&&(s.oneHitTime===undefined||finite(s.oneHitTime)&&s.oneHitTime>=0&&s.oneHitTime<=5)&&(s.phaseTime===undefined||finite(s.phaseTime)&&s.phaseTime>=0&&s.phaseTime<=5)&&(s.magnetTime===undefined||finite(s.magnetTime)&&s.magnetTime>=0&&s.magnetTime<=3)&&(s.shieldTime===undefined||finite(s.shieldTime)&&s.shieldTime>=0&&s.shieldTime<=5)&&(s.helmetReady===undefined||typeof s.helmetReady==='boolean')&&(s.helmetCollected===undefined||typeof s.helmetCollected==='boolean')&&(s.helmetGraceTime===undefined||finite(s.helmetGraceTime)&&s.helmetGraceTime>=0&&s.helmetGraceTime<=.25)&&(s.hpBonus===undefined||Number.isSafeInteger(s.hpBonus)&&s.hpBonus>=0&&s.hpBonus<=200)&&(s.benchUsed===undefined||typeof s.benchUsed==='boolean')&&(s.benchSpawned===undefined||typeof s.benchSpawned==='boolean')&&(s.seed===undefined||finite(s.seed))&&(s.relics===undefined||Number.isSafeInteger(s.relics)&&s.relics>=0)&&(s.claimedRelics===undefined||Number.isSafeInteger(s.claimedRelics)&&s.claimedRelics>=0&&s.claimedRelics<=(s.relics??0))&&(s.oreClaimed===undefined||Number.isSafeInteger(s.oreClaimed)&&s.oreClaimed>=0&&s.oreClaimed<=s.ore)
+  &&s.x>=0&&s.x<=448&&s.y>=0&&s.y<=s.rows*32+300&&s.hp>=0&&s.hp<=PICKS[s.pick].hp+(s.hpBonus??0)&&Number.isInteger(s.nudges)&&s.nudges>=0&&s.nudges<=PICKS[s.pick].nudges&&s.ore>=0;
 }
 export function decodeProgress(raw:string):Progress|null {
  try{
@@ -24,10 +45,17 @@ export function decodeProgress(raw:string):Progress|null {
    ||!p.receipts||typeof p.receipts!=='object'||Object.keys(p.receipts).length>30||!Object.values(p.receipts).every(x=>x&&Number.isSafeInteger(x.amount)&&x.amount>=0&&typeof x.rewarded==='boolean')
    ||!Number.isSafeInteger(p.revision)||p.revision<0)return null;
   if(p.best.length===12)p.best.push(...Array(LEVELS.length-12).fill(0));
+  p.mode=p.mode==='endless'?'endless':'campaign';
+  p.aura=AURAS.includes(p.aura)?p.aura:'none';
+  p.endlessBest=Number.isSafeInteger(p.endlessBest)&&p.endlessBest>=0?p.endlessBest:0;p.relics=Number.isSafeInteger(p.relics)&&p.relics>=0?p.relics:0;
   p.lang=p.lang==='en'?'en':'ru';p.sound=p.sound!==false;p.tutorial=p.tutorial===true;p.owned=[...new Set(p.owned)] as Item[];
-  if(p.attempt){p.attempt.doubleLeft??=0;}
+  if(p.attempt){p.attempt.doubleLeft??=0;p.attempt.oneHitTime??=0;p.attempt.phaseTime??=0;p.attempt.magnetTime??=0;p.attempt.shieldTime??=0;p.attempt.helmetGraceTime??=0;p.attempt.hpBonus??=0;p.attempt.benchUsed??=false;p.attempt.benchSpawned??=false;migrateDurability(p.attempt);migrateHelmet(p.attempt);p.attempt.helmetReady??=false;}
   if(p.attempt&&!validRun(p.attempt))p.attempt=null;
-  if(p.attempt){p.attempt.events=[];p.attempt.contacts={};p.attempt.fuses??=[];}
+  if(p.attempt){normalizeRunAchievements(p.attempt);p.attempt.events=[];p.attempt.contacts={};p.attempt.fuses??=[];}
+  if(p.endlessAttempt){p.endlessAttempt.doubleLeft??=0;p.endlessAttempt.oneHitTime??=0;p.endlessAttempt.phaseTime??=0;p.endlessAttempt.magnetTime??=0;p.endlessAttempt.shieldTime??=0;p.endlessAttempt.helmetGraceTime??=0;p.endlessAttempt.hpBonus??=0;p.endlessAttempt.benchUsed??=false;p.endlessAttempt.benchSpawned??=false;p.endlessAttempt.relics??=0;p.endlessAttempt.claimedRelics??=0;p.endlessAttempt.oreClaimed??=0;p.endlessAttempt.mode='endless';migrateDurability(p.endlessAttempt);migrateHelmet(p.endlessAttempt);p.endlessAttempt.helmetReady??=false;}
+  if(p.endlessAttempt&&(!validRun(p.endlessAttempt)||p.endlessAttempt.mode!=='endless'))p.endlessAttempt=null;
+  if(p.endlessAttempt){normalizeRunAchievements(p.endlessAttempt);p.endlessAttempt.events=[];p.endlessAttempt.contacts={};p.endlessAttempt.fuses??=[];}
+  p.achievements=restoreAchievements(p.achievements,p);
   return p;
  }catch{return null;}
 }
