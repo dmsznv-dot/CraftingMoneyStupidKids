@@ -108,37 +108,36 @@ const HEADS:Record<Pick,[string,string,string,string]>={
  obsidian:['#171024','#483052','#796091','#c09ddd'],
  netherite:['#221a20','#514048','#82747e','#c1afb6'],
 };
-// Original silhouette following the supplied reference: curved wide head, long diagonal grip.
+// Original 16×16 silhouette: a slim arched head and a two-pixel diagonal grip.
+// The outline is part of the drawing; expanding it made the head look like a thick hook.
 // Gameplay rotates this icon -90 degrees to align its grip with the existing compound collider.
 export function pickPixels(pick:Pick):Pixels {
  const px=blank(),[dark,mid,light,shine]=HEADS[pick];
  const shape=[
   '................',
-  '.....ddddddd....',
-  '....dllllllmdd..',
-  '....dmmlmmmllmd.',
-  '.....ddd.hhmmmmd',
-  '........hh.dlmmd',
-  '.......hh..dlmmd',
-  '......hh...dlmmd',
-  '.....hh....dlmmd',
-  '....hh.....dlmmd',
-  '...hh......dlmmd',
-  '..hh........ddd.',
+  '................',
+  '......dddddd....',
+  '.....dlllllmdd..',
+  '.....dmdddmmmmd.',
+  '......d.hh.dmmmd',
+  '.......hh...dmmd',
+  '......hh....dmmd',
+  '.....hh.....dmmd',
+  '....hh......dmmd',
+  '...hh.......dmmd',
+  '..hh.........dd.',
   '.hh.............',
-  'hh..............',
-  'h...............',
+  '.d..............',
+  '................',
   '................',
  ];
  shape.forEach((row,y)=>[...row].forEach((c,x)=>{
   if(c==='.')return;
-  const color=c==='d'?dark:c==='m'?mid:c==='l'?light:(x+y)%3===0?'#9b7755':(x+y)%3===1?'#684b39':'#483631';
+  const color=c==='d'?dark:c==='m'?mid:c==='l'?light:
+   shape[y][x+1]==='h'?((x+y)%3===0?'#987458':'#76533f'):'#43312b';
   set(px,x,y,color);
  }));
- for(const [x,y] of [[5,2],[6,2],[8,2],[12,3]])set(px,x,y,shine);
- // Single-pixel rim separates the tool from both dark caves and bright stone.
- const filled=px.map(c=>c!==null);
- for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++)if(!filled[y*SIZE+x]&&[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>x+dx>=0&&x+dx<SIZE&&y+dy>=0&&y+dy<SIZE&&filled[(y+dy)*SIZE+x+dx]))set(px,x,y,'#151116');
+ for(const [x,y] of [[6,3],[7,3],[9,3]])set(px,x,y,shine);
  return px;
 }
 export function paint(ctx:CanvasRenderingContext2D,px:Pixels,scale:number,alpha=1){
