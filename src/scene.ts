@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import {COLS,TILE,WIDTH,PICKS,BLOCKS,BLAST_RADIUS} from './core.ts';
-import {blockPixels,crackPixels,pickPixels,paint,DEBRIS,CRACK_STAGES} from './textures.ts';
+import {blockPixels,crackPixels,paint,DEBRIS,CRACK_STAGES} from './textures.ts';
 import type {Run,RunEvent,BlockType,Pick} from './core.ts';
+import {pickImages} from './pick-sprite.ts';
 export interface Bridge {run:()=>Run;cue:()=>{x:number;y:number;dir:number}|null;tick:(dt:number)=>void;select:(column:number)=>void;ready:()=>void;effect:(e:RunEvent)=>void;placing:()=>boolean;exitText:()=>string}
 const BLOCK_TYPES=Object.keys(BLOCKS) as BlockType[];
 export class MineScene extends Phaser.Scene {
@@ -24,7 +25,7 @@ export class MineScene extends Phaser.Scene {
    const tex=canvas(type+variant,48);paint(tex.context,blockPixels(type,variant),3);tex.refresh();
   }
   for(let stage=0;stage<CRACK_STAGES;stage++){const tex=canvas('crack'+stage,48);paint(tex.context,crackPixels(stage),3,.7);tex.refresh();}
-  for(const key of Object.keys(PICKS) as Pick[]){const tex=canvas('pick-'+key,64);paint(tex.context,pickPixels(key),4);tex.refresh();}
+  for(const key of Object.keys(PICKS) as Pick[]){const tex=canvas('pick-'+key,64);tex.context.drawImage(pickImages[key],0,0,64,64);tex.refresh();}
  }
  resize(){
   const w=this.scale.width,h=this.scale.height;

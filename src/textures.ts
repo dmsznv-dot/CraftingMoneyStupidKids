@@ -1,4 +1,4 @@
-import type {BlockType,Pick} from './core.ts';
+import type {BlockType} from './core.ts';
 // Original 16×16 pixel art in a blocky voxel-game style, drawn from code. No third-party assets.
 export type Pixels=(string|null)[];
 export const SIZE=16;
@@ -97,47 +97,6 @@ export function crackPixels(stage:number):Pixels {
   }
  }
  set(px,7,7,'#111111');set(px,8,7,'#111111');
- return px;
-}
-const HEADS:Record<Pick,[string,string,string,string]>={
- wood:['#4a3519','#6e5128','#94703a','#b38f55'],
- stone:['#3f3f3f','#5f5f5f','#828282','#a3a3a3'],
- iron:['#6b6b6b','#b9b9b9','#dcdcdc','#ffffff'],
- gold:['#8a6410','#d4a521','#f5d54a','#fff6b0'],
- diamond:['#0e6b63','#27b8a8','#5ff0dc','#d2fff7'],
- obsidian:['#171024','#483052','#796091','#c09ddd'],
- netherite:['#221a20','#514048','#82747e','#c1afb6'],
-};
-// Original 16×16 silhouette: a slim arched head and a two-pixel diagonal grip.
-// The outline is part of the drawing; expanding it made the head look like a thick hook.
-// Gameplay rotates this icon -90 degrees to align its grip with the existing compound collider.
-export function pickPixels(pick:Pick):Pixels {
- const px=blank(),[dark,mid,light,shine]=HEADS[pick];
- const shape=[
-  '................',
-  '................',
-  '......dddddd....',
-  '.....dlllllmdd..',
-  '.....dmdddmmmmd.',
-  '......d.hh.dmmmd',
-  '.......hh...dmmd',
-  '......hh....dmmd',
-  '.....hh.....dmmd',
-  '....hh......dmmd',
-  '...hh.......dmmd',
-  '..hh.........dd.',
-  '.hh.............',
-  '.d..............',
-  '................',
-  '................',
- ];
- shape.forEach((row,y)=>[...row].forEach((c,x)=>{
-  if(c==='.')return;
-  const color=c==='d'?dark:c==='m'?mid:c==='l'?light:
-   shape[y][x+1]==='h'?((x+y)%3===0?'#987458':'#76533f'):'#43312b';
-  set(px,x,y,color);
- }));
- for(const [x,y] of [[6,3],[7,3],[9,3]])set(px,x,y,shine);
  return px;
 }
 export function paint(ctx:CanvasRenderingContext2D,px:Pixels,scale:number,alpha=1){

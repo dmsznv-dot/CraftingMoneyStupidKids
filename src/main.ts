@@ -9,7 +9,7 @@ import {messages,nudgeCount} from './i18n.ts';
 import type {Key} from './i18n.ts';
 import {AudioBus} from './audio.ts';
 import {MineScene} from './scene.ts';
-import {pickPixels,SIZE} from './textures.ts';
+import {pickUrls,preparePickSprites} from './pick-sprite.ts';
 import './style.css';
 
 const platform=new Platform(),store=new SaveStore(),audio=new AudioBus();
@@ -26,7 +26,7 @@ const svg=(name:string)=>{
  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]??paths.spark)+'</svg>';
 };
 const nugget='<span class="nugget" aria-hidden="true"></span>';
-function pickIcon(key:Pick,size=''){return `<svg class="pick-icon ${size}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${pickPixels(key).map((c,i)=>c?`<rect x="${i%SIZE}" y="${Math.floor(i/SIZE)}" width="1" height="1" fill="${c}"/>`:'').join('')}</svg>`;}
+function pickIcon(key:Pick,size=''){return `<img class="pick-icon ${size}" src="${pickUrls[key]}" alt="" aria-hidden="true" draggable="false">`;}
 function save(force=false){p.attempt=structuredClone(r);p.attempt.events=[];p.revision++;store.save(p);void store.flush(p,force);}
 function notify(text:string){const el=document.querySelector<HTMLElement>('#toast')!;el.textContent=text;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600);}
 function syncGate(){const active=r?.status==='playing'&&!platform.gate.paused;platform.gameplay(active);audio.pause(platform.gate.paused||!active);}
@@ -159,6 +159,7 @@ function effect(e:RunEvent){
  if(e.type==='hit'&&e.weak&&e.kind&&warnedRun!==r.id){warnedRun=r.id;const need=pickKeys.find(k=>PICKS[k].tier>=BLOCKS[e.kind!].tier);notify(need?t('tooHard').replace('{pick}',t(need).toLowerCase()):t('unbreakable'));}
 }
 async function boot(){
+ await preparePickSprites();
  await platform.init();const loaded=await store.load(platform.player);p=loaded.local;remote=loaded.remote;
  if(!loaded.hasLocal&&!loaded.remote)p.lang=platform.language==='en'?'en':'ru';
  audio.enabled=p.sound;
