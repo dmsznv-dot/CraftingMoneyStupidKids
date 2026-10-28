@@ -154,3 +154,71 @@
 .drop-indicator path { fill:none; stroke:#f3d283; stroke-width:3; stroke-linecap:square; stroke-linejoin:round; }
 @keyframes hint-pulse { 0%,100% { opacity:.5; } 50% { opacity:.95; } }
 @media (prefers-reduced-motion:reduce) { .drop-indicator { animation:none; opacity:.8; } }
+
+.settings-panel h2 { padding:0 44px 0 0; text-align:left; }
+.volume-settings { display:grid; gap:24px; margin:28px 0 24px; text-align:left; }
+.volume-row { display:grid; gap:10px; font:700 14px var(--sans); color:#f2efdf; }
+.volume-row span { display:flex; justify-content:space-between; gap:16px; }
+.volume-row output { color:#ffe1a0; font-variant-numeric:tabular-nums; }
+.volume-row input { width:100%; height:26px; margin:0; accent-color:#e3c375; cursor:pointer; touch-action:pan-x; }
+.volume-row input:focus-visible { outline:3px solid #f5d071; outline-offset:2px; }
+.game-shell .settings-mute { width:100%; min-height:44px; }
+
+.depth-value { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+.game-shell .hud-stat #depth.is-record { color:#ffd374; }
+.record-label { color:#ffd374; font:800 9px/1 var(--sans); letter-spacing:.02em; animation:record-pulse 1.15s ease-in-out infinite; }
+.game-shell #hp-fill.low { background:linear-gradient(90deg,#d42d2d,#ff6550); animation:critical-pulse .8s ease-in-out infinite; }
+@keyframes critical-pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+@keyframes record-pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+@media (prefers-reduced-motion:reduce) { .record-label,.game-shell #hp-fill.low { animation:none; } }
+
+/* Enchantments show their ability and temporary, free upgrade progression. */
+.aura-entry { min-width:0; display:flex; flex-direction:column; gap:8px; }
+.game-shell .aura-entry .aura-card { width:100%; min-height:150px; }
+.skill-details { flex:1; padding:9px; border:1px solid #ffffff30; background:#111c; text-align:left; font:11px/1.4 var(--sans); color:#eee; }
+.skill-details b { color:#ffe1a0; display:block; }
+.skill-details p { margin:5px 0; color:#ddd; }
+.skill-details small { color:#bbb; display:block; }
+.game-shell .skill-upgrade { width:100%; min-height:40px; margin-top:8px; padding:7px 4px; font-size:10px; }
+.skill-free { grid-column:1/-1; margin:0; }
+
+@media(max-width:700px) { .skill-details { font-size:10px; } }
+
+
+.game-shell .drop-button { position:relative; }
+.drop-button .skill-icon { display:grid; place-items:center; }
+.drop-button .skill-icon svg { width:38px; height:38px; }
+.drop-button .skill-count { position:absolute; right:4px; bottom:4px; min-width:21px; padding:2px 4px; background:#171919; border:1px solid #aaa; color:#fff2c6; font:700 12px/1 var(--sans); text-align:center; }
+
+/* Align the currency display with the square controls in the header. */
+.game-shell .top-actions .wallet { height:44px; min-height:44px; border:2px solid #17191a; border-radius:2px; box-shadow:inset 2px 2px 0 #a39167,inset -2px -2px 0 #292b24,0 3px 0 #111; }
+
+/* Square language flags stay inside the raised edges of the button. */
+.game-shell .top-actions #language .language-flag { display:block; width:32px; height:32px; flex:none; }
+
+/* Help and atlas use the same charcoal panels and square buttons as settings. */
+.settings-links { display:grid; gap:10px; margin-top:14px; }
+.game-shell .settings-links button { width:100%; min-height:44px; justify-content:space-between; }
+.game-shell .guide-panel { max-width:720px; text-align:left; }
+.guide-panel h2 { margin:20px 45px 0 0; }
+.guide-panel .guide-back { min-height:40px; padding:8px 14px; }
+.guide-intro { margin:14px 0 22px; color:#d5d8ce; font:15px/1.5 var(--sans); }
+.guide-steps,.atlas-list { display:grid; gap:9px; }
+.guide-steps section,.atlas-entry { display:flex; align-items:flex-start; gap:14px; padding:13px; border:1px solid #ffffff2b; background:#0b0b0bbd; }
+.guide-steps section>span { display:grid; place-items:center; flex:none; width:32px; height:32px; background:#393a36; color:#ffe1a0; font:700 15px var(--sans); }
+.guide-steps b,.atlas-entry b { color:#f4f2e5; font:700 14px/1.3 var(--sans); }
+.guide-steps p,.atlas-entry p { margin:5px 0 0; color:#d1d3cb; font:13px/1.45 var(--sans); }
+.atlas-section h3 { margin:24px 0 10px; color:#dbc28b; font:700 13px var(--sans); letter-spacing:.06em; }
+.atlas-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.atlas-entry img { width:48px; height:48px; image-rendering:pixelated; flex:none; }
+.atlas-entry small { display:inline-flex; align-items:center; gap:6px; margin-top:8px; color:#f5d78c; font:700 12px var(--sans); }
+.atlas-entry .nugget { width:13px; height:9px; }
+@media(max-width:560px) { .atlas-list { grid-template-columns:1fr; }.game-shell .guide-panel { padding:20px 16px; }.guide-panel h2 { font-size:26px; } }
+
+/* Leave room for the persistent workshop button above the shop dialog. */
+.game-shell .modal-layer.is-shop { padding-top:120px; }
+@media(max-width:700px) { .game-shell .modal-layer.is-shop { padding-top:calc(110px + env(safe-area-inset-top)); } }
+.atlas-tier-icons { display:flex; flex-wrap:wrap; gap:4px; width:65px; flex:none; }
+.atlas-tier-icons span { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.atlas-tier-icons img { width:30px; height:30px; }
+.atlas-entry .atlas-tier-icons small { margin:0; font:700 9px/1 var(--sans); color:#eee; }

@@ -1,5 +1,11 @@
 export type Pick = 'wood'|'stone'|'iron'|'gold'|'diamond'|'obsidian'|'netherite';
 export type Enchant = 'none'|'wave'|'chain';
+export type SkillAura='fire'|'lightning'|'enchanted'|'ghost';
+export const SKILL_MAX_LEVEL=5;
+export function skillStats(aura:SkillAura,level:number){
+ const n=Math.max(1,Math.min(SKILL_MAX_LEVEL,Math.floor(level)||1));
+ return {uses:[1,2,2,3,3][n-1],duration:aura==='enchanted'?[2,2,2.5,2.5,3][n-1]:[3,3,4,4,5][n-1],radius:[3,3,4,4,5][n-1],speed:aura==='enchanted'&&n===5?1.15:aura==='ghost'&&n===5?1.1:1};
+}
 export type BlockType = 'dirt'|'stone'|'hard'|'gold'|'gem'|'tnt'|'obsidian'|'bedrock'|'coal'|'copper'|'iron'|'emerald'|'ancient'|'double'|'sweep'|'repair'|'relic'|'onehit'|'phase'|'bench'|'drill'|'magnet'|'curse'|'shield'|'coalCharge'|'vein'|'helmet';
 export const TILE=32, COLS=14, WIDTH=COLS*TILE;
 // tier gates which blocks a pick mines properly; soft multiplies damage to dirt and stone.
@@ -47,12 +53,13 @@ export const UNDERTIER=.35,BLAST_RADIUS=50,BLAST_DAMAGE=4,FUSE_DELAY=.3;
 // Head tips are the working edge: they wear the pick less than a blow with the body or handle.
 export const PICK_PARTS=[{x:0,y:0,r:11,wear:1},{x:-21,y:-13,r:5,wear:.65},{x:21,y:-13,r:5,wear:.65},{x:0,y:25,r:4,wear:1}];
 export interface Block {x:number;y:number;type:BlockType;hp:number}
-export interface RunEvent {type:'hit'|'break'|'blast'|'nudge'|'fuse'|'bonus';x:number;y:number;kind?:BlockType;value?:number;weak?:boolean}
+export interface RunEvent {type:'hit'|'break'|'blast'|'nudge'|'fuse'|'bonus'|'revive'|'skill';x:number;y:number;kind?:BlockType;value?:number;weak?:boolean}
 export interface RunCounters {tnt:number;bonuses:number;oreBlocks:number;helmetSaves:number;oreTypes:BlockType[];bonusTypes:BlockType[]}
 export interface RunLedger {tnt:number;bonuses:number;oreBlocks:number;helmetSaves:number;ore:number;finished:boolean}
 export interface Run {
  achievementStats?:RunCounters;achievementLedger?:RunLedger;
- version:1;durabilityVersion?:4;blockBalanceVersion?:1;id:string;level:number;pick:Pick;enchant:Enchant;rows:number;blocks:Block[];
+ skillAura?:SkillAura;skillLevel?:number;skillCharges?:number;skillMaxCharges?:number;skillFireTime?:number;skillDrillTime?:number;skillGhostTime?:number;chainActive?:boolean;
+ version:1;durabilityVersion?:4;blockBalanceVersion?:1;recordBefore?:number;id:string;level:number;pick:Pick;enchant:Enchant;rows:number;blocks:Block[];
  mode?:'campaign'|'endless';seed?:number;relics?:number;claimedRelics?:number;oreClaimed?:number;oneHitTime?:number;phaseTime?:number;magnetTime?:number;shieldTime?:number;helmetReady?:boolean;helmetCollected?:boolean;helmetGraceTime?:number;hpBonus?:number;benchUsed?:boolean;benchSpawned?:boolean;
  x:number;y:number;vx:number;vy:number;angle:number;spin:number;hp:number;nudges:number;
  ore:number;doubleLeft:number;time:number;lastNudge:number;lastHit:number;hits:number;status:'ready'|'playing'|'won'|'lost';
@@ -91,15 +98,24 @@ function random(seed:number){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Mat
 const EARLY_ACTIONS:BlockType[]=['onehit','drill','sweep'];
 const MID_ACTIONS:BlockType[]=[...EARLY_ACTIONS,'magnet'];
 const DEEP_ACTIONS:BlockType[]=[...MID_ACTIONS,'phase'];
-function addEndlessAction(type:BlockType,difficulty:number,rand:()=>number):BlockType{
+// Early bonuses are useful without letting a starter pick skip the whole mine.
+export function depthBonusStats(row:number){const depth=Math.max(0,row-4);return depth<100?{weight:.3,drillWeight:1.5,drill:4,magnet:1.5}:depth<200?{weight:.6,drillWeight:1,drill:7,magnet:2}:{weight:1,drillWeight:1,drill:10,magnet:3};}
+function addEndlessAction(type:BlockType,difficulty:number,rand:()=>number,row:number):BlockType{
  if(type!=='stone'&&type!=='dirt')return type;
  const roll=rand();
  if(roll<.012)return 'tnt';
  if(roll>=.252)return type;
  const pool=difficulty>=3?DEEP_ACTIONS:difficulty>=2?MID_ACTIONS:EARLY_ACTIONS;
- let actionRoll=rand()*pool.reduce((sum,action)=>sum+(action==='phase'?.08:1),0);
- for(const action of pool){actionRoll-=action==='phase'?.08:1;if(actionRoll<0)return action;}
+ const weight=(action:BlockType)=>action==='phase'?.08:action==='drill'?depthBonusStats(row).drillWeight:action==='magnet'?depthBonusStats(row).weight:1;
+ let actionRoll=rand()*pool.reduce((sum,action)=>sum+weight(action),0);
+ for(const action of pool){actionRoll-=weight(action);if(actionRoll<0)return action;}
  return pool[pool.length-1];
+}
+// The undisturbed surface is a continuous row of earth; never rebuild mined rows mid-run.
+export function ensureSurface(r:Run){
+ if(r.status!=='ready')return;
+ const surface:Block[]=Array.from({length:COLS},(_,x)=>({x,y:4,type:'dirt',hp:BLOCKS.dirt.hp}));
+ r.blocks=[...surface,...r.blocks.filter(block=>block.y!==4)];
 }
 // Starts the procedural mine with the same seeded surface layout on every platform.
 export function createRun(_level:number,pick:Pick,enchant:Enchant='none',starter=false,seedOverride?:number):Run {
@@ -118,10 +134,10 @@ export function createRun(_level:number,pick:Pick,enchant:Enchant='none',starter
   const old=blocks.find(b=>b.x===x&&b.y===y);if(old){old.type=type;old.hp=BLOCKS[type].hp;}else blocks.push({x,y,type,hp:BLOCKS[type].hp});
  }
  const bonusRand=random(seed^0x5eb2d91);
- for(const block of blocks){block.type=addEndlessAction(block.type,1,bonusRand);block.hp=BLOCKS[block.type].hp;}
+ for(const block of blocks){block.type=addEndlessAction(block.type,1,bonusRand,block.y);block.hp=BLOCKS[block.type].hp;}
  const run:Run={version:1,durabilityVersion:4,blockBalanceVersion:1,id:crypto.randomUUID(),level:0,pick,enchant,rows:12,blocks,x:224,y:64,vx:18,vy:0,angle:-.5,spin:3.8,
   hp:PICKS[pick].hp,nudges:PICKS[pick].nudges,ore:0,doubleLeft:0,time:0,lastNudge:-10,lastHit:-10,hits:0,status:'ready',starter,starterPlaced:false,events:[],contacts:{},fuses:[],seed,mode:'endless',relics:0,claimedRelics:0,oneHitTime:0,phaseTime:0};
- extendEndlessMine(run);return run;
+ ensureSurface(run);extendEndlessMine(run);return run;
 }
 /** Extend an endless mine beneath the camera with a seeded, progressively richer and harder section. */
 export function extendEndlessMine(r:Run){
@@ -129,6 +145,7 @@ export function extendEndlessMine(r:Run){
  const start=r.rows,end=start+32,section=Math.floor(start/32),difficulty=Math.min(44,section+1);r.level=difficulty;
  const rand=random((r.seed??1)+section*7919+17),route:number[]=[];let lane=4+Math.floor(rand()*6);
  const bonusRand=random((r.seed??1)^Math.imul(section+1,0x7f4a7c15));
+ const balanceRand=random((r.seed??1)^Math.imul(section+1,0x379bc517));
  for(let k=0;k<24;k++){lane=Math.max(2,Math.min(COLS-3,lane+(rand()<.25?-1:rand()>.75?1:0)));route.push(lane);}
  // A lucky chamber gives a breather, while the surrounding tunnel stays packed.
  const chamber=rand()<.14,cx=1+Math.floor(rand()*(COLS-4)),cy=start+4+Math.floor(rand()*22),cw=2+Math.floor(rand()*2),ch=2+Math.floor(rand()*2);
@@ -150,15 +167,17 @@ export function extendEndlessMine(r:Run){
    else if(q>.96&&difficulty>=22)type='obsidian';else if(q>.88&&difficulty>=7)type='hard';
    else type=difficulty<3?'dirt':'stone';
    if(near&&type==='stone'&&x===route[segment%route.length])type=y%6===0?'copper':'dirt';
+   const directAction=type==='drill'||type==='magnet';
    // Add bonus finds on otherwise ordinary ground. The chance ramps up as
    // the run unlocks a wider pool, while ores and hazards keep their rates.
    if((type==='stone'||type==='dirt')&&difficulty>=2){
     const bonusChance=.035+Math.min(1,(difficulty-1)/5)*.075;
-    if(rand()<bonusChance)type=pickEndlessBonus(difficulty,rand);
+    if(rand()<bonusChance)type=pickEndlessBonus(difficulty,rand,y);
    }
+   if(directAction&&balanceRand()>Math.min(1,type==='drill'?depthBonusStats(y).drillWeight:depthBonusStats(y).weight))type='stone';
    if(r.helmetCollected&&type==='helmet')type='stone';
    // A separate random stream keeps existing repair and double placements intact.
-   type=addEndlessAction(type,difficulty,bonusRand);
+   type=addEndlessAction(type,difficulty,bonusRand,y);
    r.blocks.push({x,y,type,hp:BLOCKS[type].hp});
   }
  }
@@ -172,15 +191,15 @@ export function extendEndlessMine(r:Run){
  // Keep a generous tunnel behind the camera so memory and collision checks stay bounded.
  const cutoff=Math.max(4,Math.floor(r.y/TILE)-42);r.blocks=r.blocks.filter(b=>b.y>=cutoff);
 }
-function pickEndlessBonus(difficulty:number,rand:()=>number):BlockType{
+function pickEndlessBonus(difficulty:number,rand:()=>number,row:number):BlockType{
  const candidates:{type:BlockType;from:number;weight:number}[]=[
   {type:'double',from:2,weight:1.7},
-  {type:'drill',from:3,weight:1.6},
+  {type:'drill',from:3,weight:1.6*depthBonusStats(row).drillWeight},
   {type:'sweep',from:4,weight:1.5},
   {type:'onehit',from:4,weight:1.8},
-  {type:'magnet',from:4,weight:1.5},
+  {type:'magnet',from:4,weight:1.5*depthBonusStats(row).weight},
   {type:'phase',from:6,weight:.6},
-  {type:'shield',from:2,weight:.08},
+  {type:'shield',from:2,weight:.025},
   {type:'coalCharge',from:3,weight:.8},
   {type:'vein',from:2,weight:.08},
   {type:'helmet',from:3,weight:.08},
@@ -201,8 +220,10 @@ export function placeStarter(r:Run,column:number):boolean {
  if(r.status!=='ready'||!r.starter||r.starterPlaced||!Number.isInteger(column)||column<0||column>=COLS)return false;
  r.blocks.push({x:column,y:3,type:'tnt',hp:BLOCKS.tnt.hp});r.starterPlaced=true;return true;
 }
+// Queue drills during cascades so every destroyed drill activates once without recursive drill chains.
+interface BonusCascade {drills:{count:number}[];processing:boolean}
 // One shared collection path for pick, enchantment, TNT and bonus cascades.
-export function collectBlock(r:Run,b:Block,drop=true,allowDrill=true){
+export function collectBlock(r:Run,b:Block,drop=true,cascade:BonusCascade={drills:[],processing:false}){
  if(b.hp<=0)return;b.hp=0;
  if(b.type==='double'){
   r.doubleLeft=5;emit(r,{type:'break',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:0});
@@ -219,7 +240,8 @@ export function collectBlock(r:Run,b:Block,drop=true,allowDrill=true){
   r.phaseTime=3;emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:3});return;
  }
  if(b.type==='magnet'){
-  r.magnetTime=3;emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:3});return;
+  const duration=r.mode==='endless'?depthBonusStats(b.y).magnet:3;
+  r.magnetTime=duration;emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:duration});return;
  }
  if(b.type==='shield'){
   r.shieldTime=5;emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:5});return;
@@ -242,7 +264,7 @@ export function collectBlock(r:Run,b:Block,drop=true,allowDrill=true){
   emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:1});return;
  }
  if(b.type==='curse'){
-  const damage=Math.ceil(maxDurability(r)*.25);r.hp=Math.max(0,r.hp-damage);
+  const damage=Math.ceil(maxDurability(r)*.25);applyWear(r,damage);
   emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:damage});return;
  }
  if(b.type==='bench'){
@@ -254,16 +276,24 @@ export function collectBlock(r:Run,b:Block,drop=true,allowDrill=true){
   emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:'bench',value:next?1:50});return;
  }
  if(b.type==='drill'){
-  emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:10});
-  if(!allowDrill)return;
-  const firstRow=Math.floor(r.y/TILE)+1,lastRow=firstRow+9,minX=r.x-22,maxX=r.x+22;
-  const targets=r.blocks.filter(other=>other.hp>0&&other.y>=firstRow&&other.y<=lastRow&&other.type!=='bedrock'&&other.type!=='drill'
-    &&other.x*TILE+TILE>minX&&(other.x*TILE)<maxX)
-   .sort((a,b)=>a.y-b.y||Math.abs(a.x*TILE+16-r.x)-Math.abs(b.x*TILE+16-r.x)).slice(0,10);
-  for(const target of targets){
-   if(target.type==='tnt')lightTnt(r,target);
-   else collectBlock(r,target,true,false);
+  const count=r.mode==='endless'?depthBonusStats(b.y).drill:10;
+  emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,value:count});
+  cascade.drills.push({count});if(cascade.processing)return;
+  cascade.processing=true;
+  while(cascade.drills.length){
+   const {count:limit}=cascade.drills.shift()!;
+   // Follow the column directly under the pick. Empty cells (including the
+   // drill just collected) do not spend the number of blocks it can break.
+   const firstRow=Math.floor(r.y/TILE)+1,column=Math.max(0,Math.min(COLS-1,Math.floor(r.x/TILE)));
+   const targets=r.blocks.filter(other=>other.hp>0&&other.y>=firstRow&&other.type!=='bedrock'
+     &&other.x===column)
+    .sort((a,b)=>a.y-b.y).slice(0,limit);
+   for(const target of targets){
+    if(target.type==='tnt')lightTnt(r,target);
+    else collectBlock(r,target,true,cascade);
+   }
   }
+  cascade.processing=false;
   return;
  }
  if(b.type==='relic'){
@@ -274,7 +304,7 @@ export function collectBlock(r:Run,b:Block,drop=true,allowDrill=true){
   emit(r,{type:'bonus',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type});
   for(const c of r.blocks){if(c.hp<=0||c.y!==b.y||BLOCKS[c.type].blastproof)continue;
    if(c.type==='tnt')lightTnt(r,c);
-   else collectBlock(r,c,PICKS[r.pick].tier>=BLOCKS[c.type].tier);
+   else collectBlock(r,c,PICKS[r.pick].tier>=BLOCKS[c.type].tier,cascade);
   }return;
  }
  const base=drop?BLOCKS[b.type].ore:0,mult=base>0&&r.doubleLeft>0?2:1,value=base*mult;
@@ -316,13 +346,15 @@ function hit(r:Run,b:Block,wear=1){
  const weak=PICKS[r.pick].tier<BLOCKS[b.type].tier&&(r.oneHitTime??0)<=0;
  emit(r,{type:'hit',x:b.x*TILE+16,y:b.y*TILE+16,kind:b.type,weak});
  if(b.type==='tnt'){blast(r,b.x*TILE+16,b.y*TILE+16);return;}
- const terrainWear=b.type==='dirt'?1:b.type==='stone'?2:undefined;
- const shielded=(r.shieldTime??0)>0||(r.helmetGraceTime??0)>0;
- if((r.oneHitTime??0)>0){const wearScale=r.mode==='endless'?.55+Math.min(.25,Math.floor(r.y/(32*TILE))*.006):1;if(!shielded)applyWear(r,terrainWear??BLOCKS[b.type].wear*wear*.3*wearScale);damage(r,b,b.hp+1,true);return;}
+ // Upgraded picks lose less durability to common terrain; ore keeps its own wear.
+ const terrainScale=r.pick==='wood'?1:.5;
+ const terrainWear=b.type==='dirt'?terrainScale:b.type==='stone'?2*terrainScale:undefined;
+ const shielded=(r.shieldTime??0)>0||(r.helmetGraceTime??0)>0||(r.skillFireTime??0)>0;
+ if((r.oneHitTime??0)>0||(r.skillDrillTime??0)>0){const wearScale=r.mode==='endless'?.55+Math.min(.25,Math.floor(r.y/(32*TILE))*.006):1;if(!shielded)applyWear(r,terrainWear??BLOCKS[b.type].wear*wear*.3*wearScale);damage(r,b,b.hp+1,true);return;}
  // A pick too weak for the block glances off: little damage either way.
  const wearScale=r.mode==='endless'?.55+Math.min(.25,Math.floor(r.y/(32*TILE))*.006):1;
  if(!shielded)applyWear(r,terrainWear??BLOCKS[b.type].wear*wear*(weak?.5:1)*wearScale);
- if(damage(r,b,pickDamage(r.pick,b.type),!weak)&&!weak&&r.enchant==='chain'&&BLOCKS[b.type].ore>0){
+ if(damage(r,b,pickDamage(r.pick,b.type),!weak)&&!weak&&(r.chainActive||r.enchant==='chain')&&BLOCKS[b.type].ore>0){
   const q=[b];let count=0;while(q.length&&count++<20){const base=q.shift()!;for(const c of r.blocks){if(c.hp>0&&c.type===b.type&&Math.abs(c.x-base.x)+Math.abs(c.y-base.y)===1){collectBlock(r,c);q.push(c);}}}
  }
  if(r.enchant==='wave'&&r.hits%8===0){
@@ -330,22 +362,55 @@ function hit(r:Run,b:Block,wear=1){
   for(const c of r.blocks){if(c!==b&&c.hp>0&&Math.hypot(c.x-b.x,c.y-b.y)<1.8&&c.type!=='tnt')damage(r,c,pickDamage(r.pick,c.type),PICKS[r.pick].tier>=BLOCKS[c.type].tier);}
  }
 }
+// Each run snapshots the equipped ability and its available charges.
+export function activateSkill(r:Run):boolean {
+ if(r.status!=='playing'||!r.skillAura||!(r.skillCharges&&r.skillCharges>0))return false;
+ const stats=skillStats(r.skillAura,r.skillLevel??1);
+ // Count the whole block, not only its centre: touching the field is enough.
+ const targets=r.skillAura==='lightning'?r.blocks.filter(b=>{
+  if(b.hp<=0||BLOCKS[b.type].ore<=0)return false;
+  const x=Math.max(b.x*TILE,Math.min(r.x,(b.x+1)*TILE)),y=Math.max(b.y*TILE,Math.min(r.y,(b.y+1)*TILE));
+  return Math.hypot(x-r.x,y-r.y)<=stats.radius*TILE;
+ }):[];
+ if(r.skillAura==='lightning'&&!targets.length)return false;
+ r.skillCharges--;
+ if(r.skillAura==='fire')r.skillFireTime=Math.max(r.skillFireTime??0,stats.duration);
+ else if(r.skillAura==='ghost'){r.phaseTime=Math.max(r.phaseTime??0,stats.duration);r.skillGhostTime=Math.max(r.skillGhostTime??0,stats.duration);}
+ else if(r.skillAura==='enchanted'){r.skillDrillTime=Math.max(r.skillDrillTime??0,stats.duration);r.vy=Math.max(r.vy,350*stats.speed);r.spin=15;}
+ else if(r.skillAura==='lightning'){
+  emit(r,{type:'skill',x:r.x,y:r.y,value:stats.radius*TILE});
+  for(const b of targets)collectBlock(r,b,true);
+ }
+ return true;
+}
+// Shared resurrection event: future ad revives can use the same audiovisual feedback.
+export function reviveRun(r:Run,amount:number,source:'helmet'|'ad'):boolean {
+ if(r.hp>0||!Number.isFinite(amount)||amount<=0)return false;
+ r.hp=Math.min(maxDurability(r),amount);r.status='playing';r.helmetGraceTime=.25;
+ emit(r,{type:'revive',x:r.x,y:r.y,kind:source==='helmet'?'helmet':undefined,value:r.hp});return true;
+}
+function rescueHelmet(r:Run):boolean {
+ if(!r.helmetReady||r.hp>0)return false;
+ r.helmetReady=false;reviveRun(r,Math.ceil(PICKS[r.pick].hp*.25),'helmet');
+ emit(r,{type:'bonus',x:r.x,y:r.y,kind:'helmet',value:-1});return true;
+}
 function applyWear(r:Run,amount:number){
- if(amount<=0)return;
- if(r.helmetReady&&r.hp-amount<=0){r.hp=Math.ceil(PICKS[r.pick].hp*.25);r.helmetReady=false;r.helmetGraceTime=.25;emit(r,{type:'bonus',x:r.x,y:r.y,kind:'helmet',value:-1});return;}
- r.hp-=amount;
+ if(amount<=0||(r.helmetGraceTime??0)>0)return;
+ r.hp=Math.max(0,r.hp-amount);if(r.hp<=0)rescueHelmet(r);
 }
 export function stepRun(r:Run,dt:number){
  if(r.status==='ready')r.status='playing';
  if(r.status!=='playing')return;
- if(r.hp<=0){r.status='lost';return;}
- dt=Math.min(Math.max(dt,0),1/60);r.time+=dt;r.oneHitTime=Math.max(0,(r.oneHitTime??0)-dt);r.phaseTime=Math.max(0,(r.phaseTime??0)-dt);r.magnetTime=Math.max(0,(r.magnetTime??0)-dt);r.shieldTime=Math.max(0,(r.shieldTime??0)-dt);r.helmetGraceTime=Math.max(0,(r.helmetGraceTime??0)-dt);
+ if(r.hp<=0&&!rescueHelmet(r)){r.status='lost';return;}
+ dt=Math.min(Math.max(dt,0),1/60);r.time+=dt;r.skillFireTime=Math.max(0,(r.skillFireTime??0)-dt);r.skillDrillTime=Math.max(0,(r.skillDrillTime??0)-dt);r.skillGhostTime=Math.max(0,(r.skillGhostTime??0)-dt);r.oneHitTime=Math.max(0,(r.oneHitTime??0)-dt);r.phaseTime=Math.max(0,(r.phaseTime??0)-dt);r.magnetTime=Math.max(0,(r.magnetTime??0)-dt);r.shieldTime=Math.max(0,(r.shieldTime??0)-dt);r.helmetGraceTime=Math.max(0,(r.helmetGraceTime??0)-dt);
  for(const f of r.fuses.filter(f=>f.t<=r.time)){
   r.fuses.splice(r.fuses.indexOf(f),1);const b=r.blocks.find(b=>b.x===f.x&&b.y===f.y&&b.type==='tnt'&&b.hp>0);
   if(b)blast(r,b.x*TILE+16,b.y*TILE+16);
  }
- const phased=r.phaseTime>0,magnetized=r.magnetTime>0&&!phased;
- r.vy=Math.min(phased?440:230,r.vy+(phased?900:330)*dt);r.vx*=Math.exp(-.12*dt);
+ const phased=r.phaseTime>0,drilling=(r.skillDrillTime??0)>0&&!phased,magnetized=r.magnetTime>0&&!phased&&!drilling;
+ const drillSpeed=drilling?skillStats('enchanted',r.skillLevel??1).speed:1,phaseSpeed=phased&&(r.skillGhostTime??0)>0?skillStats('ghost',r.skillLevel??1).speed:1;
+ if(drilling){r.vy=Math.max(350*drillSpeed,r.vy);r.spin=15;}
+ r.vy=Math.min(phased?440*phaseSpeed:drilling?380*drillSpeed:230,r.vy+(phased?900:330)*dt);r.vx*=Math.exp(-.12*dt);
  if(magnetized){
   let target:Block|undefined,nearest=Infinity;
   for(const b of r.blocks){if(b.hp<=0||b.type==='bedrock')continue;const dx=b.x*TILE+16-r.x,dy=b.y*TILE+16-r.y,d2=dx*dx+dy*dy;if(d2<nearest){nearest=d2;target=b;}}
@@ -364,6 +429,7 @@ export function stepRun(r:Run,dt:number){
    if(b.hp<=0||Math.abs(b.y*TILE+16-cy)>17+part.r||Math.abs(b.x*TILE+16-cx)>17+part.r)continue;
    const nx=Math.max(b.x*TILE,Math.min(cx,(b.x+1)*TILE)),ny=Math.max(b.y*TILE,Math.min(cy,(b.y+1)*TILE));
    let dx=cx-nx,dy=cy-ny,d=Math.hypot(dx,dy);if(d>=part.r)continue;
+   if(drilling&&b.type!=='bedrock'){hit(r,b,part.wear);continue;}
    if(d===0){dx=0;dy=-1;d=1;}
    const ux=dx/d,uy=dy/d;r.x+=ux*(part.r-d);r.y+=uy*(part.r-d);
    const v=r.vx*ux+r.vy*uy;
@@ -377,7 +443,7 @@ export function stepRun(r:Run,dt:number){
  // Escape geometrical stalls without consuming a player's nudge.
  if(r.time-r.lastHit>3&&Math.abs(r.vx)+Math.abs(r.vy)<20){r.vx=65*Math.sin(r.time);r.vy=70;}
  r.hp=Math.max(0,r.hp);
- if(r.hp<=0)r.status='lost';else if(r.mode==='endless'){
+ if(r.hp<=0&&!rescueHelmet(r))r.status='lost';else if(r.mode==='endless'){
   const preloadRows=96;
   while(r.y>(r.rows-preloadRows)*TILE){const oldRows=r.rows;extendEndlessMine(r);if(r.rows===oldRows)break;}
  }

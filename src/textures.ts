@@ -68,9 +68,44 @@ function bonusPixels(rand:()=>number,art:BonusArt):Pixels{
  return px;
 }
 const LETTERS=[['###','.#.','.#.','.#.','.#.'],['#..#','##.#','#.##','#..#','#..#'],['###','.#.','.#.','.#.','.#.']];
-export function blockPixels(type:BlockType|'grass'|'cave',variant:number):Pixels {
+export function blockPixels(type:BlockType|'grass'|'grassTop'|'cave'|'treeWood'|'treeLeaves'|'cobble',variant:number,bonusTier?:1|2|3):Pixels {
  const rand=random(type.length*977+variant*131+7);
- const bonus=BONUS_ART[type as BlockType];if(bonus)return bonusPixels(rand,bonus);
+ if(type==='cobble'){
+  const px=pattern(rand,['#55595a','#65696a','#737779','#848889','#96999a'],6,6,.6);
+  // Uneven mortar joints and small highlights make distinct, rough stones.
+  for(const y of [4,9,14])for(let x=0;x<SIZE;x++)set(px,x,(y+(x%7===0?1:0))%SIZE,rand()<.7?'#424647':'#505455');
+  for(const [top,bottom,columns] of [[0,4,[4,10]],[5,9,[2,7,13]],[10,14,[5,11]],[15,16,[2,9]]] as const)
+   for(const x of columns)for(let y=top;y<bottom;y++)set(px,(x+(y%3===0?1:0))%SIZE,y,'#494d4e');
+  for(let i=0;i<14;i++)set(px,Math.floor(rand()*SIZE),Math.floor(rand()*SIZE),'#a5a8a6');
+  return px;
+ }
+ if(type==='treeWood'){
+  const bark=['#49301d','#5a3b23','#69482a','#795432','#89623a'];
+  const px=pattern(rand,bark,6,3,.55);
+  for(let x=0;x<SIZE;x+=3+Math.floor(rand()*2))for(let y=0;y<SIZE;y++)if(rand()>.17)set(px,x+(y%7===0?1:0),y,bark[rand()<.7?0:1]);
+  return px;
+ }
+ if(type==='treeLeaves'){
+  const leaves=['#29451f','#355c27','#41732d','#508735','#669c3d','#79ad4b'];
+  return pattern(rand,leaves,5,5,.5);
+ }
+ const bonus=BONUS_ART[type as BlockType];if(bonus){
+  if(bonusTier&&(type==='drill'||type==='magnet')){
+   const palettes:Record<'drill'|'magnet',[string,string,string,string][]>=
+    {drill:[['#492d27','#734738','#a4664c','#d39d79'],['#552f22','#8e482c','#c36b40','#e59b69'],['#592922','#9f3c24','#df6532','#ffb45d']],
+     magnet:[['#233b4c','#355a6e','#557e90','#8fb3bd'],['#173e50','#285f74','#408ba2','#79bdcc'],['#123a53','#1a6582','#219fbd','#8be6f0']]};
+   const px=bonusPixels(rand,{...bonus,colors:palettes[type][bonusTier-1]});
+   if(type==='drill'){
+    const digits:Record<string,string[]>={'0':['111','101','101','101','111'],'1':['010','110','010','010','111'],'4':['101','101','111','001','001'],'7':['111','001','010','010','010']};
+    const label=bonusTier===1?'4':bonusTier===2?'7':'10',width=label.length*4-1,x0=15-width,y0=10;
+    for(let y=y0-1;y<16;y++)for(let x=x0-1;x<16;x++)set(px,x,y,'#402a25');
+    [...label].forEach((digit,i)=>digits[digit].forEach((row,y)=>[...row].forEach((c,x)=>{if(c==='1')set(px,x0+i*4+x,y0+y,'#fff0cf');})));
+   }
+   return px;
+  }
+  return bonusPixels(rand,bonus);
+ }
+ if(type==='grassTop')return pattern(rand,GRASS,4,4,.5);
  if(type==='dirt'||type==='grass'){
   const px=pattern(rand,DIRT,4,4,.45);
   for(let i=0;i<5;i++)set(px,Math.floor(rand()*SIZE),Math.floor(rand()*SIZE),DIRT[5]);

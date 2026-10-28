@@ -23,3 +23,7 @@ The mining pop has its leading silence trimmed. Original downloaded texture-pack
 - `The_Bards_Tale.mp3` — full version of The Bard's Tale by RandomMind, [source on OpenGameArt](https://opengameart.org/content/medieval-the-bards-tale), listed as CC0. Part of the background playlist.
 
 - `Minstrel_Dance.mp3` — background music by RandomMind, [source on OpenGameArt](https://opengameart.org/content/medieval-minstrel-dance), listed as CC0.
+
+- `revive.mp3` — shortened, gently faded excerpt of [AHHHH](https://freesound.org/people/random_intruder/sounds/392172/) by random_intruder, Freesound lists CC0. Played on resurrection; the original is not included.
+
+- `workshop.mp3` — a 1.25-second edit of [Hammer hitting an anvil](https://freesound.org/people/draftcraft/sounds/434339/) by draftcraft, listed on Freesound under CC0. Two hammer strikes and a short metallic sound play when opening the workshop. Original recording was supplied by the user.

@@ -20,11 +20,11 @@ test('legacy runs retain their durability percentage and migrate only once',()=>
  assert.deepEqual(Object.values(PICKS).map(pick=>pick.hp),[50,65,85,72.5,115,155,200]);
 });
 
-test('magnet lasts three seconds, attracts a block and gravity keeps pulling down',()=>{
+test('early magnet lasts 1.5 seconds, attracts a block and gravity keeps pulling down',()=>{
  const r=createRun(9,'wood');r.blocks=[{x:9,y:4,type:'stone',hp:2.5}];
  r.x=224;r.y=400;r.vx=0;r.vy=0;r.status='playing';
  collectBlock(r,{x:7,y:12,type:'magnet',hp:1});
- assert.equal(r.magnetTime,3);assert.equal(r.events.at(-1)?.value,3);
+ assert.equal(r.magnetTime,1.5);assert.equal(r.events.at(-1)?.value,1.5);
  stepRun(r,1/60);
  assert.ok(r.vx>0,'the magnet pulls toward the block');
  assert.ok(r.vy>0,'gravity keeps pulling down even when the target is above');
