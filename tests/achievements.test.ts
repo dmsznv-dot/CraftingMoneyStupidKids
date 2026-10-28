@@ -25,14 +25,14 @@ test('helmet resurrection counts separately from picking up the helmet',()=>{
 });
 
 test('save, reload and switching between two runs do not duplicate lifetime counters',()=>{
- const p=freshProgress(),endless=createRun(0,'wood','none',false,123),campaign=createRun(0,'wood');
- endless.blocks=[];campaign.blocks=[];
+ const p=freshProgress(),endless=createRun(0,'wood','none',false,123),other=createRun(0,'wood','none',false,456);
+ endless.blocks=[];other.blocks=[];
  collectBlock(endless,block('coal'));collectBlock(endless,block('sweep'));endless.status='playing';endless.time=1;endless.rows=120;endless.y=3200;
  syncAchievements(p,endless);syncAchievements(p,endless);
- collectBlock(campaign,block('copper'));campaign.status='lost';syncAchievements(p,campaign);
- p.endlessAttempt=endless;p.attempt=campaign;
- const loaded=decodeProgress(JSON.stringify(p))!;assert.ok(loaded?.endlessAttempt&&loaded.attempt);
- syncAchievements(loaded,loaded.endlessAttempt!);syncAchievements(loaded,loaded.attempt!);
+ collectBlock(other,block('copper'));other.status='lost';syncAchievements(p,other);
+ p.endlessAttempt=endless;
+ const loaded=decodeProgress(JSON.stringify(p))!;assert.ok(loaded?.endlessAttempt);
+ syncAchievements(loaded,loaded.endlessAttempt!);
  assert.equal(loaded.achievements.totalOre,3);assert.equal(loaded.achievements.oreBlocks,2);
  assert.equal(loaded.achievements.bonuses,1);assert.equal(loaded.achievements.runs,1);
  assert.equal(loaded.achievements.bestDepth,100);assert.equal(loaded.achievements.woodDepth,100);

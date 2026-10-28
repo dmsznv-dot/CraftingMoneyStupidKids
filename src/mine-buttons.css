@@ -1,0 +1,156 @@
+/* One endless mine: compact left-side readout and a central launch control. */
+.game-shell .hud,.game-shell[data-game-mode='endless'] .hud { top:78px; left:18px; width:154px; display:flex; flex-direction:column; align-items:stretch; gap:6px; }
+.game-shell .hud-stat,.game-shell .hp-stat { width:100%; min-height:56px; padding:8px 10px; }
+.game-shell .hud-pick { display:flex; align-items:center; justify-content:flex-start; gap:7px; min-width:0; margin:0; padding:8px; border:1px solid #78908088; border-radius:10px; background:linear-gradient(#29463de8,#192f2bf0); box-shadow:inset 0 1px #c4e4c62d,0 3px 10px #0004; }
+.hud-pick .pick-icon { width:36px; height:36px; }
+.hud-pick b { font-size:12px; white-space:normal; overflow-wrap:anywhere; }
+.hud-pick small { font-size:10px; }
+.game-shell .powerup-counter { width:100%; max-width:none; margin:0; display:flex; flex-wrap:wrap; }
+.game-shell .relic-counter { margin:0; padding:3px 2px; }
+.game-shell .hud-shop,.game-shell #tnt-slot { pointer-events:auto; width:100%; }
+.game-shell .hud-shop { min-height:42px; justify-content:center; }
+.game-shell #tnt-slot button { width:100%; font-size:10px; }
+.game-shell.is-playing .hud-shop,.game-shell.is-playing #tnt-slot { display:none; }
+.game-shell .preparation { left:50%; right:auto; bottom:max(20px,env(safe-area-inset-bottom)); transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; width:min(300px,calc(100% - 32px)); max-width:none; padding:0; border:0; border-radius:0; background:none; box-shadow:none; text-align:center; pointer-events:none; }
+.game-shell .drop-button { pointer-events:auto; display:grid; place-items:center; width:94px; height:94px; min-height:0; padding:12px; border-radius:50%; border:4px solid #322818; background:radial-gradient(circle at 35% 25%,#ffe8a9 0%,#eac171 48%,#a66c36 100%); box-shadow:inset 0 4px 0 #fff1bf,inset 0 -7px 0 #96642e,0 5px 0 #171b17,0 10px 24px #0009; transition:filter .15s,transform .15s; }
+.game-shell .drop-button:hover { filter:brightness(1.1); }
+.game-shell .drop-button:active { transform:translateY(3px); box-shadow:inset 0 4px 0 #fff1bf,inset 0 -4px 0 #96642e,0 2px 0 #171b17; }
+.game-shell .drop-button .pick-icon { width:64px; height:64px; filter:drop-shadow(1px 2px 1px #3b260c); }
+.drop-label { margin-top:8px; color:#fff2ce; font:700 14px/1.2 var(--sans); text-shadow:0 2px 4px #000; }
+.prep-hint { margin-top:4px; color:#d9e6d1; font:11px/1.3 var(--sans); text-shadow:0 2px 4px #000; }
+.game-shell .pause { top:78px; }
+.game-shell .modal-layer { padding-top:76px; }
+/* Original pixel-bevel treatment inspired by classic block-game menus. */
+.game-shell button:not(.drop-button) { border:2px solid #17191a; border-radius:2px; background:linear-gradient(#949794,#737674); color:#fff; box-shadow:inset 2px 2px 0 #d3d5cf,inset -2px -2px 0 #454847,0 3px 0 #111; text-shadow:1px 2px 0 #303331; }
+.game-shell button:not(.drop-button):hover:not(:disabled) { background:linear-gradient(#a8aaa2,#858a83); color:#fff4c7; }
+.game-shell button:not(.drop-button):active:not(:disabled) { transform:translateY(2px); box-shadow:inset 2px 2px 0 #4b4d4a,inset -2px -2px 0 #cacbc6,0 1px 0 #111; }
+.game-shell button:not(.drop-button):disabled { opacity:.54; }
+.game-shell button:not(.drop-button):focus-visible { outline:3px solid #f5d071; outline-offset:2px; }
+.game-shell .aura-card { padding:8px 6px 10px; }
+.game-shell .aura-card[aria-pressed='true'],.game-shell .achievement-filter[aria-pressed='true'] { border-color:#f2cf82; background:linear-gradient(#797550,#4a563e); box-shadow:inset 2px 2px 0 #f9e2a2,inset -2px -2px 0 #574921,0 3px 0 #111; }
+.game-shell .aura-card small { color:#eff0dc; }
+.game-shell .achievement-filter { border-radius:2px; }
+.game-shell .nudge-button { border-radius:2px; }
+.game-shell .modal-panel .close { border-radius:2px; }
+@media (max-width:700px) {
+ .game-shell .hud,.game-shell[data-game-mode='endless'] .hud { top:calc(66px + env(safe-area-inset-top)); left:8px; width:112px; gap:4px; }
+ .game-shell .hud-stat,.game-shell .hp-stat { min-height:49px; padding:6px 7px; }
+ .game-shell .hud-stat label { font-size:9px; }
+ .game-shell .hud-stat b { font-size:15px; }
+ .game-shell .hud-pick { padding:5px; gap:4px; }.hud-pick .pick-icon { width:30px; height:30px; }.hud-pick b { font-size:11px; }.hud-pick small { font-size:9px; }
+ .game-shell .hud-shop { min-height:40px; font-size:11px; }
+ .game-shell .pause { top:calc(66px + env(safe-area-inset-top)); }
+ .game-shell .modal-layer { padding-top:calc(66px + env(safe-area-inset-top)); }
+ .game-shell .preparation { bottom:max(14px,env(safe-area-inset-bottom)); width:min(270px,calc(100% - 24px)); }
+ .game-shell .drop-button { width:84px; height:84px; }.game-shell .drop-button .pick-icon { width:56px; height:56px; }
+ .drop-label { font-size:13px; }.prep-hint { font-size:10px; }
+}
+@media (max-height:520px) and (min-width:701px) { .game-shell .hud,.game-shell[data-game-mode='endless'] .hud { top:70px; }.game-shell .hud-stat { min-height:44px; padding:5px 8px; }.game-shell .hud-pick { padding:4px 7px; }.game-shell .preparation { bottom:8px; }.game-shell .drop-button { width:72px; height:72px; }.game-shell .drop-button .pick-icon { width:48px; height:48px; }.game-shell .modal-layer { padding-top:64px; } }
+
+/* Minecraft-inspired readouts are translucent, their contents stay opaque. */
+.game-shell .hud-stat,.game-shell .hud-pick {
+ border:1px solid rgba(155,155,155,.32); border-radius:2px;
+ background:rgba(15,15,15,.72); box-shadow:inset 1px 1px rgba(255,255,255,.1),0 2px 4px #0006;
+}
+.game-shell .achievement-badge { text-shadow:none; }
+.game-shell .topbar .hud-shop {
+ position:absolute; top:64px; right:18px; width:197px; min-height:42px;
+ display:flex; justify-content:center; align-items:center; pointer-events:auto;
+}
+.game-shell.is-playing .topbar .hud-shop { display:none; }
+.game-shell .drop-button {
+ padding:0; border-color:#202221;
+ background:radial-gradient(circle at 35% 25%,#b6b8b5 0%,#858886 48%,#575a59 100%);
+ box-shadow:inset 0 4px 0 #dedfdb,inset 0 -7px 0 #505351,0 5px 0 #171b17,0 10px 24px #0009;
+}
+.game-shell .drop-button:active { box-shadow:inset 0 4px 0 #dedfdb,inset 0 -4px 0 #505351,0 2px 0 #171b17; }
+.game-shell .drop-button .pick-icon { margin:0; display:block; filter:drop-shadow(1px 2px 1px #303331); }
+@media(max-width:700px) { .game-shell .topbar .hud-shop { top:55px; right:8px; width:182px; min-height:44px; } }
+@media(max-width:380px) { .game-shell .topbar .hud-shop { right:6px; width:179px; } }
+/* The source sprite has asymmetric transparent margins. */
+.game-shell .drop-button .pick-icon { transform:translate(-3%,-3%); }
+
+/* Match the other pixel-bevel controls and center the sprite's visible bounds. */
+.game-shell button:not(.drop-button) { text-shadow:none; }
+.game-shell .drop-button {
+ display:grid; place-items:center; justify-content:center; align-content:center;
+ border:2px solid #17191a; border-radius:2px;
+ background:linear-gradient(#949794,#737674);
+ box-shadow:inset 2px 2px 0 #d3d5cf,inset -2px -2px 0 #454847,0 3px 0 #111;
+}
+.game-shell .drop-button:hover { background:linear-gradient(#a8aaa2,#858a83); filter:none; }
+.game-shell .drop-button:active { transform:translateY(2px); box-shadow:inset 2px 2px 0 #4b4d4a,inset -2px -2px 0 #cacbc6,0 1px 0 #111; }
+.game-shell .drop-button:focus-visible { outline:3px solid #f5d071; outline-offset:2px; }
+.game-shell .drop-button .pick-icon { filter:none; }
+
+/* One persistent center control, flanked by nudges only during a run. */
+.game-shell .preparation { width:min(300px,calc(100% - 24px)); }
+.game-shell .preparation .controls,
+.game-shell .preparation .controls.dormant,
+.game-shell .preparation .controls.auto-mode {
+ position:static; display:flex; flex-direction:column; align-items:center; transform:none;
+ min-height:0; max-height:none; padding:0; gap:7px; border:0; border-radius:0;
+ background:none; box-shadow:none; pointer-events:none;
+}
+.game-shell .control-row { display:flex; align-items:center; justify-content:center; gap:10px; }
+.game-shell .control-row .nudge-button { width:62px; height:62px; pointer-events:auto; }
+.game-shell .controls.dormant .nudge-button,
+.game-shell .controls.auto-mode .nudge-button { visibility:hidden; pointer-events:none; }
+.game-shell .drop-button:disabled { opacity:1; cursor:default; }
+.game-shell .controls.dormant .charges,
+.game-shell .controls.auto-mode .charges { display:none; }
+.game-shell .charges { display:flex; width:236px; height:12px; margin:0; gap:2px; padding:2px; border:2px solid #111; background:#282828; box-shadow:0 2px #0009; }
+.game-shell .charges i { flex:1; width:auto; height:4px; border-radius:0; background:#454545; box-shadow:inset 0 1px #202020; }
+.game-shell .charges i.lit { background:#80cf1a; box-shadow:inset 0 1px #d3f47a,inset 0 -1px #4b850a; }
+@media(max-width:700px) { .game-shell .control-row { gap:8px; }.game-shell .control-row .nudge-button { width:54px; height:54px; }.game-shell .charges { width:208px; } }
+@media(max-height:520px) and (min-width:701px) { .game-shell .control-row .nudge-button { width:50px; height:50px; }.game-shell .charges { width:188px; } }
+.game-shell.is-playing #toast { bottom:calc(155px + env(safe-area-inset-bottom)); }
+.game-shell.is-playing .coach-callout { bottom:calc(155px + env(safe-area-inset-bottom)); }
+.game-shell .drop-button:disabled { background:linear-gradient(#626662,#4d514e); box-shadow:inset 2px 2px 0 #8a8d88,inset -2px -2px 0 #363936,0 3px 0 #111; }
+.game-shell .drop-button:disabled .pick-icon { opacity:.68; }
+@media(max-height:520px) and (min-width:701px) { .game-shell.is-playing #toast,.game-shell.is-playing .coach-callout { bottom:120px; } }
+
+/* Result screen uses the same dark, translucent panels as the in-game HUD. */
+.game-shell .modal-panel.result {
+ border:1px solid rgba(155,155,155,.32); border-radius:2px;
+ background:rgba(15,15,15,.86); box-shadow:inset 1px 1px rgba(255,255,255,.1),0 8px 24px #0008;
+}
+.game-shell .result .run-summary div,.game-shell .result .result-mark {
+ border:1px solid rgba(155,155,155,.32); border-radius:2px;
+ background:rgba(15,15,15,.72); box-shadow:inset 1px 1px rgba(255,255,255,.1);
+}
+.game-shell .result [data-action='workshop'] { min-width:min(220px,100%); min-height:44px; padding:10px 22px; justify-content:center; }
+
+/* Consistent charcoal surfaces throughout menus, with gold for selection and rewards. */
+.game-shell .modal-panel {
+ border:1px solid rgba(155,155,155,.32); border-radius:2px;
+ background:rgba(15,15,15,.86); box-shadow:inset 1px 1px rgba(255,255,255,.1),0 8px 24px #0008;
+}
+.game-shell .modal-panel .result-mark,
+.game-shell .shop-panel .tool-card,
+.game-shell .achievement-summary,
+.game-shell .achievement-card,
+.game-shell .achievement-icon,
+.game-shell .upgrade-icon {
+ border:1px solid rgba(155,155,155,.32); border-radius:2px;
+ background:rgba(15,15,15,.72); box-shadow:inset 1px 1px rgba(255,255,255,.1);
+}
+.game-shell .shop-panel .tool-card.selected,
+.game-shell .achievement-card.ready { border-color:#d4b56d; background:rgba(65,53,28,.55); }
+.game-shell .modal-panel .muted,.game-shell .modal-panel .aura-hint,
+.game-shell .tool-card p,.game-shell .upgrade p,.game-shell .achievement-info p { color:#d1d1ca; }
+.game-shell .shop-wallet { border:1px solid rgba(155,155,155,.32); border-radius:2px; background:rgba(15,15,15,.72); }
+.game-shell .aura-preview { border-radius:0; background:radial-gradient(ellipse,#ffffff17,transparent 72%); }
+.game-shell .upgrade { border-color:#ffffff30; }
+.game-shell .achievement-progress { border-radius:0; background:#323232; }
+.game-shell .achievement-progress i { background:#aaa; }
+.game-shell .achievement-card.ready .achievement-progress i { background:#edca78; }
+.game-shell .aura-card[aria-pressed='true'],
+.game-shell .achievement-filter[aria-pressed='true'] { border-color:#e5c57b; background:linear-gradient(#8b805f,#62583d); box-shadow:inset 2px 2px 0 #f9e2a2,inset -2px -2px 0 #4b3c20,0 3px 0 #111; }
+
+.drop-indicator { position:absolute; z-index:5; width:calc(100px * var(--hint-zoom,1)); display:flex; align-items:center; justify-content:space-between; transform:translate(-50%,-50%); pointer-events:none; animation:hint-pulse 1.65s ease-in-out infinite; }
+.drop-indicator[hidden] { display:none; }
+.drop-indicator svg { display:block; width:calc(14px * var(--hint-zoom,1)); height:calc(20px * var(--hint-zoom,1)); overflow:visible; }
+.drop-indicator path { fill:none; stroke:#f3d283; stroke-width:3; stroke-linecap:square; stroke-linejoin:round; }
+@keyframes hint-pulse { 0%,100% { opacity:.5; } 50% { opacity:.95; } }
+@media (prefers-reduced-motion:reduce) { .drop-indicator { animation:none; opacity:.8; } }

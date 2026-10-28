@@ -4,10 +4,13 @@ import stone01Url from './assets/audio/stone01.ogg?inline';
 import bonusPopUrl from './assets/audio/bonus-pop.mp3?inline';
 import oreImpactUrl from './assets/audio/ore-impact.ogg?inline';
 import gravelUrl from './assets/audio/gravel.ogg?inline';
-import backgroundMusicUrl from './assets/audio/Loop_The_Bards_Tale.mp3?inline';
+import pickBreakUrl from './assets/audio/pick-break.mp3?inline';
+import oldTowerMusicUrl from './assets/audio/The_Old_Tower_Inn.mp3?inline';
+import bardsTaleMusicUrl from './assets/audio/The_Bards_Tale.mp3?inline';
+import minstrelDanceMusicUrl from './assets/audio/Minstrel_Dance.mp3?inline';
 // Synthesised sounds from filtered noise; each material has its own colour so digging reads by ear.
-export type Sound='hit'|'clank'|'ore'|'blast'|'fuse'|'nudge'|'win'|'break'|'bonus'|'mine';
-type Sample='dirt'|'stone'|'mine'|'oreImpact'|'gravel';
+export type Sound='hit'|'clank'|'ore'|'blast'|'fuse'|'nudge'|'win'|'break'|'bonus'|'mine'|'pickBreak';
+type Sample='dirt'|'stone'|'mine'|'oreImpact'|'gravel'|'pickBreak';
 const ORE_TYPES=new Set<BlockType>(['copper','iron','gold','gem','emerald','ancient']);
 const GRAVEL_TYPES=new Set<BlockType>([...ORE_TYPES,'coal','stone']);
 // filter: band centre; q: resonance; decay: seconds; gain: loudness; grains: crunch repeats on a break.
@@ -42,8 +45,8 @@ const MATERIAL:Record<BlockType,{filter:number;q:number;decay:number;gain:number
 };
 export class AudioBus {
  context:AudioContext|null=null;out:AudioNode|null=null;noise:AudioBuffer|null=null;enabled=true;muted=false;musicPaused=false;last=0;lastBreak=0;
- music:AudioBuffer|null=null;musicSource:AudioBufferSourceNode|null=null;musicGain:GainNode|null=null;musicLoading=false;
- samples:Partial<Record<Sample,AudioBuffer>>={};samplesStarted=false;lastSample:Record<Sample,number>={dirt:-1,stone:-1,mine:-1,oreImpact:-1,gravel:-1};
+ music:AudioBuffer[]=[];musicGain:GainNode|null=null;musicLoading=false;musicNextStart=0;musicNextIndex=0;
+ samples:Partial<Record<Sample,AudioBuffer>>={};samplesStarted=false;lastSample:Record<Sample,number>={dirt:-1,stone:-1,mine:-1,oreImpact:-1,gravel:-1,pickBreak:-1};
  unlock(){
   try{
    if(!this.context){
@@ -52,30 +55,45 @@ export class AudioBus {
     comp.connect(ctx.destination);this.context=ctx;this.out=comp;this.noise=buffer;
    }
    if(!this.samplesStarted){this.samplesStarted=true;void this.loadSamples(this.context);}
-   if(this.enabled&&!this.music&&!this.musicLoading)void this.loadMusic(this.context);
+   if(this.enabled&&!this.music.length&&!this.musicLoading)void this.loadMusic(this.context);
    void this.context.resume();
   }catch{/* silence is safe */}
  }
  setEnabled(on:boolean){
   this.enabled=on;
-  if(on&&this.context){if(this.music)this.startMusic();else if(!this.musicLoading)void this.loadMusic(this.context);}
+  if(on&&this.context){if(this.music.length)this.startMusic();else if(!this.musicLoading)void this.loadMusic(this.context);}
   this.updateMusicVolume();
  }
  async loadMusic(context:AudioContext){
   this.musicLoading=true;
   try{
-   const response=await fetch(backgroundMusicUrl);if(!response.ok)throw new Error('music request failed');
-   const buffer=await context.decodeAudioData(await response.arrayBuffer());
+   const tracks=await Promise.allSettled([bardsTaleMusicUrl,oldTowerMusicUrl,minstrelDanceMusicUrl].map(async url=>{
+    const response=await fetch(url);if(!response.ok)throw new Error('music request failed');
+    return context.decodeAudioData(await response.arrayBuffer());
+   }));
    if(this.context!==context)return;
-   this.music=buffer;if(this.enabled)this.startMusic();
+   this.music=tracks.flatMap(track=>track.status==='fulfilled'?[track.value]:[]);
+   if(this.enabled&&this.music.length)this.startMusic();
   }catch{/* The game remains playable without background music. */}
   finally{this.musicLoading=false;}
  }
  startMusic(){
-  if(!this.enabled||!this.context||!this.out||!this.music||this.musicSource)return;
-  const source=this.context.createBufferSource(),gain=this.context.createGain();
-  source.buffer=this.music;source.loop=true;gain.gain.value=0;source.connect(gain);gain.connect(this.out);source.start();
-  this.musicSource=source;this.musicGain=gain;this.updateMusicVolume();
+  if(!this.enabled||!this.context||!this.out||!this.music.length||this.musicGain)return;
+  const gain=this.context.createGain();gain.gain.value=0;gain.connect(this.out);this.musicGain=gain;
+  this.musicNextStart=this.context.currentTime;this.musicNextIndex=0;
+  // Two scheduled tracks make transitions independent of tab throttling.
+  this.scheduleMusic();this.scheduleMusic();this.updateMusicVolume();
+ }
+ scheduleMusic(){
+  const ctx=this.context,output=this.musicGain;if(!ctx||!output||!this.music.length)return;
+  const buffer=this.music[this.musicNextIndex],fade=Math.min(2,buffer.duration/4);
+  const start=this.musicNextStart,end=start+buffer.duration;
+  const source=ctx.createBufferSource(),gain=ctx.createGain();source.buffer=buffer;
+  gain.gain.setValueAtTime(0,start);gain.gain.linearRampToValueAtTime(1,start+fade);
+  gain.gain.setValueAtTime(1,end-fade);gain.gain.linearRampToValueAtTime(0,end);
+  source.connect(gain);gain.connect(output);source.start(start);
+  this.musicNextStart=end-fade;this.musicNextIndex=(this.musicNextIndex+1)%this.music.length;
+  source.onended=()=>{source.disconnect();gain.disconnect();if(this.context===ctx&&this.musicGain===output)this.scheduleMusic();};
  }
  updateMusicVolume(){
   if(!this.context||!this.musicGain)return;
@@ -85,7 +103,7 @@ export class AudioBus {
  pause(on:boolean,keepMusic=false){this.muted=on;this.musicPaused=on&&!keepMusic;this.updateMusicVolume();if(on&&!keepMusic&&this.context?.state==='running')void this.context.suspend().catch(()=>{});else if((!on||keepMusic)&&this.context?.state==='suspended')void this.context.resume().catch(()=>{});}
  ready(){return this.enabled&&!this.muted&&!!this.context&&!!this.out&&this.context.state==='running';}
  async loadSamples(context:AudioContext){
-  const sources:{material:Sample;url:string}[]=[{material:'dirt',url:mud02Url},{material:'stone',url:stone01Url},{material:'mine',url:bonusPopUrl},{material:'oreImpact',url:oreImpactUrl},{material:'gravel',url:gravelUrl}];
+  const sources:{material:Sample;url:string}[]=[{material:'dirt',url:mud02Url},{material:'stone',url:stone01Url},{material:'mine',url:bonusPopUrl},{material:'oreImpact',url:oreImpactUrl},{material:'gravel',url:gravelUrl},{material:'pickBreak',url:pickBreakUrl}];
   await Promise.all(sources.map(async({material,url})=>{
    try{const response=await fetch(url);if(!response.ok)throw new Error('audio request failed');const bytes=await response.arrayBuffer(),buffer=await context.decodeAudioData(bytes);if(this.context===context)this.samples[material]=buffer;}
    catch{/* The synthesised material sound remains as a local fallback. */}
@@ -114,6 +132,10 @@ export class AudioBus {
   if(kind==='hit'||kind==='clank')this.last=now;
   // A blast breaks many blocks in one frame; one crunch is enough.
   if(kind==='break'){if(now-this.lastBreak<.03)return;this.lastBreak=now;}
+  if(kind==='pickBreak'){
+   if(this.playSample('pickBreak',now,0,.55))return;
+   for(let i=0;i<3;i++)this.burst(now+i*.028,MATERIAL.hard.filter*(1-i*.12),MATERIAL.hard.q,MATERIAL.hard.decay*1.6,MATERIAL.hard.gain*(1-i*.2),MATERIAL.hard.type);return;
+  }
   if(kind==='mine'){
    if(this.playSample('mine',now,.035,.58))return;
    this.tone(now,1080,1760,.12,.08,'sine');return;

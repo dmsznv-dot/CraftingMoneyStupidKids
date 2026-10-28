@@ -1,16 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createRun,LEVELS,PICKS,BLOCKS,nudge,stepRun,blast,collectBlock} from '../src/core.ts';
+import {createRun,PICKS,BLOCKS,nudge,stepRun,blast,collectBlock} from '../src/core.ts';
 import type {Pick,Block} from '../src/core.ts';
-import {freshProgress,levelReward} from '../src/progress.ts';
+import {freshProgress} from '../src/progress.ts';
 import {decodeProgress} from '../src/storage.ts';
 
-test('campaign grows to 45 mines and starts shorter and more open than late mines',()=>{
- assert.equal(LEVELS.length,45);assert.ok(LEVELS[0].rows<=14);assert.ok(LEVELS[44].rows>LEVELS[0].rows*3);
- for(let i=1;i<LEVELS.length;i++)assert.ok(LEVELS[i].rows>=LEVELS[i-1].rows);
- const early=createRun(0,'wood');assert.ok(early.blocks.length/(early.rows*14)<.65);
- for(const type of ['coal','copper']){assert.ok(early.blocks.some(b=>b.type===type));assert.equal(BLOCKS[type as keyof typeof BLOCKS].tier,0);}
-});
 test('all seven picks obey the four-nudge ceiling with a shared directional budget',()=>{
  assert.equal(Object.keys(PICKS).length,7);
  for(const key of Object.keys(PICKS) as Pick[]){const r=createRun(0,key);const budget=PICKS[key].nudges;assert.ok(budget<=4);
@@ -38,10 +32,6 @@ test('blast-activated bonuses are finite and cash in every ore block once',()=>{
 test('12-mine saves retain wallet, purchased picks and unlocks and gain empty future records',()=>{
  const p=freshProgress();p.coins=1234;p.owned=['wood','stone','iron','gold','diamond'];p.pick='diamond';p.unlocked=11;p.best=Array(12).fill(8);p.attempt=null;
  const loaded=decodeProgress(JSON.stringify(p));assert.ok(loaded);assert.equal(loaded.coins,1234);assert.equal(loaded.unlocked,11);assert.equal(loaded.best.length,45);assert.equal(loaded.best[11],8);assert.equal(loaded.best[44],0);
-});
-test('new bonus state and late picks round-trip; rewards stay bounded over 45 mines',()=>{
- const p=freshProgress();p.owned.push('netherite');p.pick='netherite';p.unlocked=44;p.attempt=createRun(44,'netherite');p.attempt.doubleLeft=3;
- const loaded=decodeProgress(JSON.stringify(p));assert.ok(loaded?.attempt);assert.equal(loaded.attempt.doubleLeft,3);assert.equal(loaded.pick,'netherite');assert.ok(levelReward(44)<400);
 });
 test('obsolete active map is discarded without losing the old wallet and tools',()=>{
  const p=freshProgress();p.coins=902;p.owned.push('stone');p.pick='stone';p.best=Array(12).fill(3);

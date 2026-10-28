@@ -14,6 +14,12 @@ Mining sound: [Minecraft pop.mp3](https://freesound.org/people/mdeliushussain/so
 
 Ore impact: [Impact Sounds](https://kenney.nl/assets/impact-sounds) by Kenney. Kenney lists the pack under CC0.
 
-Background music: `Loop_The_Bards_Tale.mp3` is a compressed copy of the user-supplied `Loop_The_Bards_Tale.wav`, used as a looping music bed. The source URL, author, and license were not supplied in this conversation; no license is asserted here.
-
 The mining pop has its leading silence trimmed. Original downloaded texture-pack experiments were reverted and are not part of this asset set.
+
+- `pick-break.mp3` — user-supplied crate break sound, plays when the pick breaks and the result screen appears. The source page and license were not supplied; no license is asserted here.
+
+- `The_Old_Tower_Inn.mp3` — background music by RandomMind, [source on OpenGameArt](https://opengameart.org/content/medieval-the-old-tower-inn), listed as CC0. Part of the background playlist with two-second crossfades.
+
+- `The_Bards_Tale.mp3` — full version of The Bard's Tale by RandomMind, [source on OpenGameArt](https://opengameart.org/content/medieval-the-bards-tale), listed as CC0. Part of the background playlist.
+
+- `Minstrel_Dance.mp3` — background music by RandomMind, [source on OpenGameArt](https://opengameart.org/content/medieval-minstrel-dance), listed as CC0.

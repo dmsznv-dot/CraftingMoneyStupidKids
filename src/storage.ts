@@ -1,7 +1,9 @@
 import {normalizeRunAchievements,restoreAchievements} from './achievements.ts';
 import {AURAS,freshProgress} from './progress.ts';
 import type {Progress,Item} from './progress.ts';
-import {PICKS,BLOCKS,COLS,LEVELS} from './core.ts';
+import {PICKS,BLOCKS,COLS} from './core.ts';
+// Retained only to validate legacy campaign save data, not generate playable maps.
+const LEGACY_LEVEL_COUNT=45,legacyRows=(level:number)=>12+Math.floor(level*1.5);
 import type {Run,BlockType} from './core.ts';
 import type {Player} from 'ysdk';
 const items=['wood','stone','iron','gold','diamond','obsidian','netherite','starter','wave','chain'];
@@ -17,6 +19,12 @@ function migrateDurability(r:Run){
  if(version<4){if(finite(r.hp))r.hp*=2;if(finite(r.hpBonus))r.hpBonus*=2;}
  r.durabilityVersion=4;
 }
+function migrateBlockBalance(r:Run){
+ if(r.blockBalanceVersion===1||!Array.isArray(r.blocks))return;
+ const old:Partial<Record<BlockType,number>>={dirt:1,coal:1,copper:1.5,stone:2.5};
+ for(const b of r.blocks){const hp=old[b.type];if(hp!==undefined&&finite(b.hp)&&b.hp>0&&b.hp<=hp)b.hp=b.hp/hp*BLOCKS[b.type].hp;}
+ r.blockBalanceVersion=1;
+}
 function migrateHelmet(r:Run){
  if(r.helmetCollected!==undefined)return;
  r.helmetCollected=!!r.helmetReady;
@@ -28,8 +36,8 @@ function migrateHelmet(r:Run){
 }
 export function validRun(r:unknown):r is Run {
  if(!r||typeof r!=='object')return false;const s=r as Run;
- return s.version===1&&s.durabilityVersion===4&&typeof s.id==='string'&&Number.isInteger(s.level)&&s.level>=0&&s.level<LEVELS.length&&s.pick in PICKS&&['none','wave','chain'].includes(s.enchant)
-  &&(s.mode==='endless'?Number.isSafeInteger(s.rows)&&s.rows>=LEVELS[s.level].rows&&s.rows<=120000:s.mode===undefined||s.mode==='campaign'?s.rows===LEVELS[s.level].rows:false)&&Array.isArray(s.blocks)&&s.blocks.length<=4000
+ return s.version===1&&s.durabilityVersion===4&&typeof s.id==='string'&&Number.isInteger(s.level)&&s.level>=0&&s.level<LEGACY_LEVEL_COUNT&&s.pick in PICKS&&['none','wave','chain'].includes(s.enchant)
+  &&(s.mode==='endless'?Number.isSafeInteger(s.rows)&&s.rows>=legacyRows(s.level)&&s.rows<=120000:s.mode===undefined||s.mode==='campaign'?s.rows===legacyRows(s.level):false)&&Array.isArray(s.blocks)&&s.blocks.length<=4000
   &&s.blocks.every(b=>b&&Number.isInteger(b.x)&&b.x>=0&&b.x<COLS&&Number.isInteger(b.y)&&b.y>=0&&b.y<s.rows&&Object.hasOwn(BLOCKS,b.type)&&finite(b.hp)&&b.hp>=0&&b.hp<=BLOCKS[b.type as BlockType].hp)
   &&(s.fuses===undefined||Array.isArray(s.fuses)&&s.fuses.length<=40&&s.fuses.every(f=>f&&Number.isInteger(f.x)&&Number.isInteger(f.y)&&finite(f.t)))
   &&['ready','playing','won','lost'].includes(s.status)&&[s.x,s.y,s.vx,s.vy,s.angle,s.spin,s.hp,s.time,s.ore,s.lastNudge,s.lastHit,s.hits,s.nudges].every(finite)
@@ -41,10 +49,10 @@ export function decodeProgress(raw:string):Progress|null {
   const p=JSON.parse(raw) as Progress;
   if(!p||p.version!==1||!Number.isSafeInteger(p.coins)||p.coins<0||!Array.isArray(p.owned)||!p.owned.includes('wood')||!p.owned.every(x=>items.includes(x))
    ||!p.owned.includes(p.pick)||!(p.pick in PICKS)||!['none','wave','chain'].includes(p.enchant)||(p.enchant!=='none'&&!p.owned.includes(p.enchant))
-   ||!Number.isInteger(p.unlocked)||p.unlocked<0||p.unlocked>=LEVELS.length||!Array.isArray(p.best)||![12,LEVELS.length].includes(p.best.length)||!p.best.every(x=>finite(x)&&x>=0)
+   ||!Number.isInteger(p.unlocked)||p.unlocked<0||p.unlocked>=LEGACY_LEVEL_COUNT||!Array.isArray(p.best)||![12,LEGACY_LEVEL_COUNT].includes(p.best.length)||!p.best.every(x=>finite(x)&&x>=0)
    ||!p.receipts||typeof p.receipts!=='object'||Object.keys(p.receipts).length>30||!Object.values(p.receipts).every(x=>x&&Number.isSafeInteger(x.amount)&&x.amount>=0&&typeof x.rewarded==='boolean')
    ||!Number.isSafeInteger(p.revision)||p.revision<0)return null;
-  if(p.best.length===12)p.best.push(...Array(LEVELS.length-12).fill(0));
+  if(p.best.length===12)p.best.push(...Array(LEGACY_LEVEL_COUNT-12).fill(0));
   p.mode=p.mode==='endless'?'endless':'campaign';
   p.aura=AURAS.includes(p.aura)?p.aura:'none';
   p.endlessBest=Number.isSafeInteger(p.endlessBest)&&p.endlessBest>=0?p.endlessBest:0;p.relics=Number.isSafeInteger(p.relics)&&p.relics>=0?p.relics:0;
@@ -52,7 +60,7 @@ export function decodeProgress(raw:string):Progress|null {
   if(p.attempt){p.attempt.doubleLeft??=0;p.attempt.oneHitTime??=0;p.attempt.phaseTime??=0;p.attempt.magnetTime??=0;p.attempt.shieldTime??=0;p.attempt.helmetGraceTime??=0;p.attempt.hpBonus??=0;p.attempt.benchUsed??=false;p.attempt.benchSpawned??=false;migrateDurability(p.attempt);migrateHelmet(p.attempt);p.attempt.helmetReady??=false;}
   if(p.attempt&&!validRun(p.attempt))p.attempt=null;
   if(p.attempt){normalizeRunAchievements(p.attempt);p.attempt.events=[];p.attempt.contacts={};p.attempt.fuses??=[];}
-  if(p.endlessAttempt){p.endlessAttempt.doubleLeft??=0;p.endlessAttempt.oneHitTime??=0;p.endlessAttempt.phaseTime??=0;p.endlessAttempt.magnetTime??=0;p.endlessAttempt.shieldTime??=0;p.endlessAttempt.helmetGraceTime??=0;p.endlessAttempt.hpBonus??=0;p.endlessAttempt.benchUsed??=false;p.endlessAttempt.benchSpawned??=false;p.endlessAttempt.relics??=0;p.endlessAttempt.claimedRelics??=0;p.endlessAttempt.oreClaimed??=0;p.endlessAttempt.mode='endless';migrateDurability(p.endlessAttempt);migrateHelmet(p.endlessAttempt);p.endlessAttempt.helmetReady??=false;}
+  if(p.endlessAttempt){p.endlessAttempt.doubleLeft??=0;p.endlessAttempt.oneHitTime??=0;p.endlessAttempt.phaseTime??=0;p.endlessAttempt.magnetTime??=0;p.endlessAttempt.shieldTime??=0;p.endlessAttempt.helmetGraceTime??=0;p.endlessAttempt.hpBonus??=0;p.endlessAttempt.benchUsed??=false;p.endlessAttempt.benchSpawned??=false;p.endlessAttempt.relics??=0;p.endlessAttempt.claimedRelics??=0;p.endlessAttempt.oreClaimed??=0;p.endlessAttempt.mode='endless';migrateDurability(p.endlessAttempt);migrateHelmet(p.endlessAttempt);migrateBlockBalance(p.endlessAttempt);p.endlessAttempt.helmetReady??=false;}
   if(p.endlessAttempt&&(!validRun(p.endlessAttempt)||p.endlessAttempt.mode!=='endless'))p.endlessAttempt=null;
   if(p.endlessAttempt){normalizeRunAchievements(p.endlessAttempt);p.endlessAttempt.events=[];p.endlessAttempt.contacts={};p.endlessAttempt.fuses??=[];}
   p.achievements=restoreAchievements(p.achievements,p);

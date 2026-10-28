@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import {COLS,TILE,WIDTH,PICKS,BLOCKS,BLAST_RADIUS} from './core.ts';
+import {COLS,TILE,WIDTH,PICKS,BLOCKS,BLAST_RADIUS,extendEndlessMine} from './core.ts';
 import {blockPixels,crackPixels,paint,DEBRIS,CRACK_STAGES} from './textures.ts';
 import type {Run,RunEvent,BlockType,Pick,Block} from './core.ts';
 import {pickImages} from './pick-sprite.ts';
@@ -45,9 +45,16 @@ export class MineScene extends Phaser.Scene {
   if(this.lastRun!==r.id){for(const view of this.blockViews.values()){view.image.destroy();view.crack?.destroy();}this.blockViews.clear();this.lastRun=r.id;this.particles=[];this.rings=[];for(const label of this.labels)label.destroy();this.labels=[];this.oreLabels=[];}
   if(r.status==='ready'){
    this.cameraFollow=false;cam.centerOn(WIDTH/2,180);
+   // Older saved ready runs may not have generated the whole visible mine yet.
+   if(r.mode==='endless')while(r.rows*TILE<cam.worldView.bottom+TILE){const rows=r.rows;extendEndlessMine(r);if(r.rows===rows)break;}
   }else{
    if(!this.cameraFollow&&r.y>=cam.worldView.centerY)this.cameraFollow=true;
    if(this.cameraFollow){const center=cam.worldView.centerY;cam.centerOn(WIDTH/2,center+(r.y-center)*Math.min(1,delta/1000*8));}
+  }
+  const indicator=document.querySelector<HTMLElement>('#drop-indicator');
+  if(indicator){
+   const visible=r.status==='ready'&&!this.bridge.placing();indicator.hidden=!visible;
+   if(visible){indicator.style.left=`${(r.x-cam.worldView.x)*cam.zoom}px`;indicator.style.top=`${(r.y-cam.worldView.y)*cam.zoom}px`;indicator.style.setProperty('--hint-zoom',String(cam.zoom));}
   }
   const caveTop=Math.max(128,cam.worldView.y);this.cave.setPosition(WIDTH/2,caveTop).setSize(WIDTH,Math.max(32,cam.worldView.bottom-caveTop));
   this.drawBackdrop(r);
@@ -87,8 +94,7 @@ export class MineScene extends Phaser.Scene {
    const steps=8;g.fillStyle(0xf3ce77,.8);for(let i=1;i<steps;i++){const k=i/steps;g.fillCircle(r.x+(cue.x-r.x)*k,r.y+(cue.y-r.y)*k-Math.sin(k*Math.PI)*28,2);}
   }
   if(r.status==='ready'){
-   g.lineStyle(1,0xeac76e,.6);for(let y=100;y<155;y+=10)g.lineBetween(r.x,y,r.x,y+4);
-   g.strokeCircle(r.x,r.y,32);g.lineStyle(1,0x6dc6a7,.35);
+   g.lineStyle(1,0x6dc6a7,.35);
    if(this.bridge.placing())for(let x=0;x<COLS;x++)g.strokeRect(x*TILE+1,3*TILE+1,30,30);
   }
  }
@@ -140,8 +146,7 @@ export class MineScene extends Phaser.Scene {
   }
   const railTop=Math.max(128,top);g.fillStyle(0x293e35);g.fillRect(-7,railTop,5,Math.max(0,bottom-railTop));g.fillRect(WIDTH+2,railTop,5,Math.max(0,bottom-railTop));
   g.fillStyle(0x17191a);g.fillRect(0,r.rows*TILE,WIDTH,Math.max(0,bottom-r.rows*TILE));
-  if(r.mode!=='endless'){const exit=r.rows*TILE+36;g.fillStyle(0x74d8ae,.09);g.fillRect(0,exit-12,WIDTH,70);g.lineStyle(2,0x7ad7ac,.65);g.lineBetween(0,exit,WIDTH,exit);
-   for(let x=0;x<WIDTH;x+=32){g.fillStyle(0x7bd9ad,.5);g.fillRect(x+10,exit+14,12,3);}}
+
  }
  fx(e:RunEvent){
   const r=this.bridge.run(),tier=PICKS[r.pick].tier;

@@ -6,7 +6,7 @@ import {decodeProgress} from '../src/storage.ts';
 
 test('legacy runs retain their durability percentage and migrate only once',()=>{
  const p=freshProgress();p.owned.push('gold','netherite');
- const campaign=createRun(0,'gold');delete campaign.durabilityVersion;campaign.hp=116;
+ const campaign=createRun(0,'gold');campaign.mode='campaign';campaign.rows=12;campaign.level=0;campaign.blocks=campaign.blocks.filter(b=>b.y<12);delete campaign.durabilityVersion;campaign.hp=116;
  const endless=createRun(0,'netherite','none',false,123);delete endless.durabilityVersion;
  endless.hp=450;endless.hpBonus=200;endless.magnetTime=8;endless.benchUsed=true;
  p.attempt=campaign;p.endlessAttempt=endless;
